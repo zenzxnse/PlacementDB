@@ -1,0 +1,67 @@
+<%inc#include "views/escaped_text.h" %>
+<%inc#include "views/safe_url.h" %>
+<%inc#include "views/view_types.h" %>
+<%inc#include "views/report_form_model.h" %>
+<%layout layouts/base %>
+<%c++
+    const auto &action_url = @@.get<SafeUrl>("action_url");
+    const auto &csrf_token = @@.get<EscapedText>("csrf_token");
+    const auto &target_public_id = @@.get<EscapedText>("target_public_id");
+    const auto &target_kind = @@.get<ContentKind>("target_kind");
+    const auto &target_title = @@.get<EscapedText>("target_title");
+    const auto &reasons = @@.get<std::vector<SelectOption>>("reasons");
+    const auto &details = @@.get<EscapedText>("details");
+    const auto &errors = @@.get<FormErrors>("errors");
+
+    auto kind_label = [](ContentKind k) -> const char * {
+        return k == ContentKind::Question ? "question" : "experience";
+    };
+
+    auto field_error = [&](const char *fid) -> const EscapedText * {
+        for (const auto &fe : errors.fields) {
+            if (fe.field_id.value() == fid) return &fe.message;
+        }
+        return nullptr;
+    };
+    const EscapedText *reason_err = field_error("reason");
+    const EscapedText *details_err = field_error("details");
+%>
+<h1>Report content</h1>
+<p>You are reporting the {% kind_label(target_kind) %} titled "{% target_title.value() %}".</p>
+<%c++ if (errors.summary.has_value()) { %>
+<div id="error-summary" role="alert" tabindex="-1" autofocus>
+    <p>{% errors.summary->value() %}</p>
+    <ul>
+<%c++     for (const auto &fe : errors.fields) { %>
+        <li><a href="#{% fe.field_id.value() %}">{% fe.message.value() %}</a></li>
+<%c++     } %>
+    </ul>
+</div>
+<%c++ } %>
+<form method="post" action="{% action_url.value() %}">
+    <input type="hidden" name="_csrf" value="{% csrf_token.value() %}">
+    <input type="hidden" name="target_public_id" value="{% target_public_id.value() %}">
+    <input type="hidden" name="target_kind" value="{% kind_label(target_kind) %}">
+    <div>
+        <label for="reason">Reason for reporting <span aria-hidden="true">*</span></label>
+<%c++     if (reason_err) { %>
+        <p class="error" id="reason-error" role="alert">{% reason_err->value() %}</p>
+<%c++     } %>
+        <select id="reason" name="reason" required<%c++ if (reason_err) { %> aria-describedby="reason-error"<%c++ } %>>
+            <option value="">Select a reason</option>
+<%c++         for (const auto &opt : reasons) { %>
+            <option value="{% opt.value.value() %}"<%c++ if (opt.selected) { %> selected<%c++ } %>>{% opt.label.value() %}</option>
+<%c++         } %>
+        </select>
+    </div>
+    <div>
+        <label for="details">Additional details <span class="hint">(optional)</span></label>
+<%c++     if (details_err) { %>
+        <p class="error" id="details-error" role="alert">{% details_err->value() %}</p>
+<%c++     } %>
+        <textarea id="details" name="details" maxlength="1000" rows="6"<%c++ if (details_err) { %> aria-describedby="details-error"<%c++ } %>>{% details.value() %}</textarea>
+    </div>
+    <div>
+        <button type="submit">Send report</button>
+    </div>
+</form>

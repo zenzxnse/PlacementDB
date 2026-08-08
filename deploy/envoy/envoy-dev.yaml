@@ -1,0 +1,103 @@
+static_resources:
+  listeners:
+    - name: placedb_loopback
+      address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 10000
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: placedb_gateway
+                codec_type: AUTO
+                use_remote_address: true
+                generate_request_id: true
+                normalize_path: true
+                merge_slashes: true
+                path_with_escaped_slashes_action: REJECT_REQUEST
+                max_request_headers_kb: 32
+                stream_idle_timeout: 30s
+                server_name: PlacementDB
+                server_header_transformation: OVERWRITE
+                route_config:
+                  name: placedb_routes
+                  virtual_hosts:
+                    - name: placedb_local
+                      domains:
+                        - "*"
+                      response_headers_to_add:
+                        - header:
+                            key: Content-Security-Policy
+                            value: "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+                          append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                        - header:
+                            key: X-Content-Type-Options
+                            value: nosniff
+                          append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                        - header:
+                            key: X-Frame-Options
+                            value: DENY
+                          append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                        - header:
+                            key: Referrer-Policy
+                            value: strict-origin-when-cross-origin
+                          append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                        - header:
+                            key: Permissions-Policy
+                            value: "geolocation=(), camera=(), microphone=()"
+                          append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                        - header:
+                            key: Cache-Control
+                            value: no-store
+                          append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                        - header:
+                            key: X-Robots-Tag
+                            value: "noindex, nofollow"
+                          append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                      routes:
+                        - match:
+                            path: /api
+                          route:
+                            cluster: placedb_api
+                            timeout: 15s
+                        - match:
+                            prefix: /api/
+                          route:
+                            cluster: placedb_api
+                            timeout: 15s
+                        - match:
+                            prefix: /
+                          route:
+                            cluster: placedb_web
+                            timeout: 15s
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  clusters:
+    - name: placedb_api
+      type: STATIC
+      connect_timeout: 1s
+      load_assignment:
+        cluster_name: placedb_api
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 8080
+    - name: placedb_web
+      type: STATIC
+      connect_timeout: 1s
+      load_assignment:
+        cluster_name: placedb_web
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 3000

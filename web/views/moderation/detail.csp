@@ -1,0 +1,118 @@
+<%layout layouts/base %>
+<%c++
+    using Row = std::unordered_map<std::string, std::string>;
+    using RowList = std::vector<Row>;
+    auto field = [](const Row &row, const std::string &key) -> std::string {
+        auto it = row.find(key);
+        return it == row.end() ? std::string() : it->second;
+    };
+    auto item = @@.get<Row>("item");
+    auto csrf = @@.get<std::string>("csrf_token");
+    auto actions = @@.getPtr<RowList>("actions");
+    auto history = @@.getPtr<RowList>("history");
+    auto reports = @@.getPtr<RowList>("reports");
+    auto conflict = @@.getPtr<std::string>("conflict");
+    auto form = @@.getPtr<Row>("form");
+    auto fv = [&](const std::string &key) -> std::string {
+        return (form && form->count(key)) ? form->at(key) : std::string();
+    };
+    auto item_id = field(item, "id");
+    auto expected_state = field(item, "state");
+    std::string fmt_text = (!field(item, "narrative").empty()) ? field(item, "narrative") : field(item, "prompt");
+%>
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+    <ol>
+        <li><a href="/moderation/queue">Moderation queue</a></li>
+        <li aria-current="page">[[ field(item, "title") ]]</li>
+    </ol>
+</nav>
+
+<header class="page-header">
+    <h1>Review: [[ field(item, "title") ]]</h1>
+    <p class="meta">Type: [[ field(item, "target_type") ]] &middot; Current state: <span class="state state-[[ expected_state ]]">[[ expected_state ]]</span></p>
+</header>
+
+<%c++ if (conflict && !conflict->empty()) { %>
+<div class="error-summary" role="alert" tabindex="-1" autofocus>
+    <h2>Someone else already reviewed this</h2>
+    <p>[[ *conflict ]]</p>
+    <p><a href="/moderation/items/[[ item_id ]]">Reload this item</a> to see the current state.</p>
+</div>
+<%c++ } %>
+
+<p><a href="/[[ field(item, "target_type") ]]s/[[ field(item, "slug") ]]">View the public page (if published)</a></p>
+
+<section aria-labelledby="content-heading">
+    <h2 id="content-heading">Content</h2>
+<%c++ if (!field(item, "prompt").empty()) { %>
+    <div class="prose">[[ field(item, "prompt") ]]</div>
+<%c++ } %>
+<%c++ if (!field(item, "answer_guidance").empty()) { %>
+    <h3>Answer guidance</h3>
+    <div class="prose">[[ field(item, "answer_guidance") ]]</div>
+<%c++ } %>
+<%c++ if (!fmt_text.empty() && field(item, "narrative") == fmt_text) { %>
+    <div class="prose">[[ fmt_text ]]</div>
+<%c++ } %>
+</section>
+
+<section aria-labelledby="history-heading">
+    <h2 id="history-heading">Audit history</h2>
+<%c++ if (history && !history->empty()) { %>
+    <ol class="history">
+<%c++ for (const auto &h : *history) { %>
+        <li>
+            <span class="meta">[[ field(h, "created_at") ]] &middot; [[ field(h, "actor_label") ]]</span><br>
+            <span class="state state-[[ field(h, "previous_state") ]]">[[ field(h, "previous_state") ]]</span>
+            to
+            <span class="state state-[[ field(h, "new_state") ]]">[[ field(h, "new_state") ]]</span>
+<%c++ if (!field(h, "reason").empty()) { %><br><span class="reason">Reason: [[ field(h, "reason") ]]</span><%c++ } %>
+        </li>
+<%c++ } %>
+    </ol>
+<%c++ } else { %>
+    <p>No moderation events recorded yet.</p>
+<%c++ } %>
+</section>
+
+<%c++ if (reports && !reports->empty()) { %>
+<section aria-labelledby="reports-heading">
+    <h2 id="reports-heading">Reports on this item</h2>
+    <table class="list-table">
+        <caption class="visually-hidden">Reports on this item</caption>
+        <thead>
+            <tr><th scope="col">Reason</th><th scope="col">Reporter</th><th scope="col">Filed</th><th scope="col">State</th></tr>
+        </thead>
+        <tbody>
+<%c++ for (const auto &r : *reports) { %>
+            <tr><th scope="row">[[ field(r, "reason") ]]</th><td><%c++ if (field(r, "reporter_label").empty()) { %>Anonymous<%c++ } else { %>[[ field(r, "reporter_label") ]]<%c++ } %></td><td>[[ field(r, "created_at") ]]</td><td><span class="state state-[[ field(r, "state") ]]">[[ field(r, "state") ]]</span></td></tr>
+<%c++ } %>
+        </tbody>
+    </table>
+</section>
+<%c++ } %>
+
+<section aria-labelledby="action-heading">
+    <h2 id="action-heading">Decision</h2>
+    <p>Every action needs a non-empty reason, including approval. The reason is stored on the audit event and cannot be edited later.</p>
+<%c++ if (actions && !actions->empty()) { %>
+    <form method="post" action="/moderation/items/[[ item_id ]]/action">
+        <input type="hidden" name="_csrf" value="[[ csrf ]]">
+        <input type="hidden" name="expected_state" value="[[ expected_state ]]">
+        <fieldset>
+            <legend>Action</legend>
+<%c++ for (const auto &a : *actions) { %>
+            <label><input type="radio" name="action" value="[[ field(a, "action") ]]" required> [[ field(a, "label") ]]</label>
+<%c++ } %>
+        </fieldset>
+        <p>
+            <label for="reason">Reason <span aria-hidden="true">*</span></label>
+            <textarea id="reason" name="reason" required minlength="5" maxlength="1000" rows="4" aria-describedby="reason-help">[[ fv("reason") ]]</textarea>
+            <span id="reason-help" class="help">Explain why you are taking this action. Required for approve, request changes, reject, hide, and restore.</span>
+        </p>
+        <button type="submit">Submit decision</button>
+    </form>
+<%c++ } else { %>
+    <p>No actions are available for this item in its current state.</p>
+<%c++ } %>
+</section>

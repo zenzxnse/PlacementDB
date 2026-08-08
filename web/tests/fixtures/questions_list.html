@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Questions - PlacementDB</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <meta name="request-id" content="01J8XN2C7QK9V3ZB1M4T5R6PWA">
+</head>
+<body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header class="site-header">
+        <div class="container">
+            <a class="brand" href="/">PlacementDB</a>
+            <nav class="site-nav" aria-label="Primary">
+                <ul>
+                    <li><a href="/questions" aria-current="page">Questions</a></li>
+                    <li><a href="/experiences">Experiences</a></li>
+                    <li><a href="/search">Search</a></li>
+                    <li><a href="/login">Log in</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    <main id="main" tabindex="-1">
+        <div class="container">
+            <header class="page-header">
+                <h1>Questions</h1>
+                <p class="lede">42 published questions.</p>
+            </header>
+            <form class="filters" action="/questions" method="get" aria-label="Filter questions">
+                <fieldset class="filter-group">
+                    <legend>Sort</legend>
+                    <label for="sort"><span class="visually-hidden">Sort by</span></label>
+                    <select id="sort" name="sort">
+                        <option value="hot" selected>Hot</option>
+                        <option value="new">New</option>
+                        <option value="top">Top</option>
+                    </select>
+                </fieldset>
+                <fieldset class="filter-group">
+                    <legend>Topic</legend>
+                    <label><input type="checkbox" name="topic" value="arrays" checked> arrays</label>
+                    <label><input type="checkbox" name="topic" value="trees"> trees</label>
+                    <label><input type="checkbox" name="topic" value="dp"> dp</label>
+                </fieldset>
+                <fieldset class="filter-group">
+                    <legend>Year</legend>
+                    <label><input type="checkbox" name="year" value="2024" checked> 2024</label>
+                    <label><input type="checkbox" name="year" value="2023"> 2023</label>
+                </fieldset>
+                <div class="filter-actions">
+                    <button type="submit">Apply filters</button>
+                    <a class="secondary" href="/questions?sort=hot">Clear filters</a>
+                </div>
+            </form>
+            <section aria-label="Results">
+                <table class="list-table">
+                    <caption class="visually-hidden">Published questions, page 1</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Title</th>
+                            <th scope="col">Company</th>
+                            <th scope="col">Role</th>
+                            <th scope="col">Round</th>
+                            <th scope="col">Year</th>
+                            <th scope="col">Difficulty</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <th scope="row"><a href="/questions/reverse-linked-list">Reverse a linked list in place</a></th>
+                            <td>Acme Corp</td>
+                            <td>SDE 1</td>
+                            <td>Tech</td>
+                            <td>2024</td>
+                            <td>3.4 (12)</td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><a href="/questions/binary-tree-lca">Lowest common ancestor in a binary tree</a></th>
+                            <td>Globex</td>
+                            <td>SDE Intern</td>
+                            <td>Online assessment</td>
+                            <td>2023</td>
+                            <td>4.1 (9)</td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><a href="/questions/two-sum-variants">Two sum variants with constraints</a></th>
+                            <td>Initech</td>
+                            <td>SDE 1</td>
+                            <td>Tech</td>
+                            <td>2024</td>
+                            <td>2.7 (21)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+            <nav class="pagination" aria-label="Pagination">
+                <span aria-current="page">1</span>
+                <a href="/questions?sort=hot&topic=arrays&page=2" rel="next">2</a>
+                <a href="/questions?sort=hot&topic=arrays&page=3">3</a>
+                <a href="/questions?sort=hot&topic=arrays&page=2" rel="next">Next page</a>
+            </nav>
+            <p class="page-meta">Page 1 of 4.</p>
+        </div>
+    </main>
+    <footer class="site-footer">
+        <div class="container">
+            <p>PlacementDB is a community question bank for SRM students. Moderators review every submission before it appears.</p>
+            <p><a href="/about">About</a> &middot; <a href="/about/moderation">Moderation policy</a> &middot; <a href="/about/accessibility">Accessibility</a></p>
+        </div>
+    </footer>
+</body>
+</html>

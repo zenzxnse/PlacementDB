@@ -1,0 +1,66 @@
+<%inc#include "views/escaped_text.h" %>
+<%inc#include "views/safe_url.h" %>
+<%inc#include "views/view_types.h" %>
+<%inc#include "views/profile_model.h" %>
+<%layout layouts/base %>
+<%c++
+    auto username = @@.get<EscapedText>("username");
+    auto display_name = @@.get<EscapedText>("display_name");
+    auto join_month = @@.get<EscapedText>("join_month");
+    auto public_question_count = @@.get<uint64_t>("public_question_count");
+    auto public_experience_count = @@.get<uint64_t>("public_experience_count");
+    auto is_self = @@.get<bool>("is_self");
+    auto edit_url_ptr = @@.getPtr<SafeUrl>("edit_url");
+    auto votes_url_ptr = @@.getPtr<SafeUrl>("votes_url");
+    auto reports_url_ptr = @@.getPtr<SafeUrl>("reports_url");
+    auto public_questions = @@.get<std::vector<ProfileContentLink>>("public_questions");
+    auto public_experiences = @@.get<std::vector<ProfileContentLink>>("public_experiences");
+%>
+<header class="page-header">
+    <h1>{% display_name.value() %}</h1>
+    <p class="lede">@{% username.value() %}<%c++ if (!join_month.value().empty()) { %> &middot; Joined {% join_month.value() %}<%c++ } %></p>
+</header>
+
+<%c++ if (is_self) { %>
+<nav class="account-actions" aria-label="Account actions">
+    <ul>
+<%c++ if (edit_url_ptr) { %>
+        <li><a href="{% edit_url_ptr->value() %}">Edit your profile</a></li>
+<%c++ } %>
+<%c++ if (votes_url_ptr) { %>
+        <li><a href="{% votes_url_ptr->value() %}">Your votes</a></li>
+<%c++ } %>
+<%c++ if (reports_url_ptr) { %>
+        <li><a href="{% reports_url_ptr->value() %}">Your reports</a></li>
+<%c++ } %>
+    </ul>
+</nav>
+<%c++ } %>
+
+<p class="counts">Published questions: {% public_question_count %} - Experiences: {% public_experience_count %}</p>
+
+<section aria-labelledby="pq-heading">
+    <h2 id="pq-heading">Published questions</h2>
+<%c++ if (!public_questions.empty()) { %>
+    <ul class="link-list">
+<%c++ for (const auto &q : public_questions) { %>
+        <li><a href="{% q.detail_url.value() %}">{% q.title.value() %}</a> <span class="meta">{% q.published_at.value() %}</span></li>
+<%c++ } %>
+    </ul>
+<%c++ } else { %>
+    <p>No published questions yet.</p>
+<%c++ } %>
+</section>
+
+<section aria-labelledby="pe-heading">
+    <h2 id="pe-heading">Published experiences</h2>
+<%c++ if (!public_experiences.empty()) { %>
+    <ul class="link-list">
+<%c++ for (const auto &e : public_experiences) { %>
+        <li><a href="{% e.detail_url.value() %}">{% e.title.value() %}</a> <span class="meta">{% e.published_at.value() %}</span></li>
+<%c++ } %>
+    </ul>
+<%c++ } else { %>
+    <p>No published experiences yet.</p>
+<%c++ } %>
+</section>

@@ -1,0 +1,49 @@
+<%inc#include "views/escaped_text.h" %>
+<%inc#include "views/safe_url.h" %>
+<%inc#include "views/view_types.h" %>
+<%inc#include "views/login_model.h" %>
+<%layout layouts/base %>
+<%c++
+    auto action_url = @@.get<SafeUrl>("action_url");
+    auto login_csrf_token = @@.get<EscapedText>("login_csrf_token");
+    auto identifier = @@.get<EscapedText>("identifier");
+    auto errors = @@.get<FormErrors>("errors");
+    const FieldError* id_err = nullptr;
+    const FieldError* pw_err = nullptr;
+    for (const auto &fe : errors.fields) {
+        if (fe.field_id.value() == "identifier") {
+            id_err = &fe;
+        } else if (fe.field_id.value() == "password") {
+            pw_err = &fe;
+        }
+    }
+%>
+<header class="page-header">
+    <h1>Log in</h1>
+</header>
+
+<%c++ if (errors.summary.has_value()) { %>
+<div class="error-summary" role="alert" tabindex="-1" id="error-summary" autofocus>
+    <h2>Check your input</h2>
+    <p>{% errors.summary.value().value() %}</p>
+</div>
+<%c++ } %>
+
+<form method="post" action="{% action_url.value() %}" novalidate>
+    <input type="hidden" name="_csrf" value="{% login_csrf_token.value() %}">
+    <p>
+        <label for="identifier">Email or username <span aria-hidden="true">*</span></label>
+        <input type="text" id="identifier" name="identifier" value="{% identifier.value() %}" autocomplete="username" required maxlength="254"<%c++ if (id_err) { %> aria-invalid="true" aria-describedby="identifier-error"<%c++ } %>>
+<%c++ if (id_err) { %>
+        <span id="identifier-error" class="field-error">{% id_err->message.value() %}</span>
+<%c++ } %>
+    </p>
+    <p>
+        <label for="password">Password <span aria-hidden="true">*</span></label>
+        <input type="password" id="password" name="password" autocomplete="current-password" required minlength="12" maxlength="256"<%c++ if (pw_err) { %> aria-invalid="true" aria-describedby="password-error"<%c++ } %>>
+<%c++ if (pw_err) { %>
+        <span id="password-error" class="field-error">{% pw_err->message.value() %}</span>
+<%c++ } %>
+    </p>
+    <button type="submit">Log in</button>
+</form>

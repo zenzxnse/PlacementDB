@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Review: Lowest common ancestor in a binary tree - PlacementDB</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <meta name="request-id" content="01J8XN2C7QK9V3ZB1M4T5R6PWB">
+</head>
+<body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header class="site-header">
+        <div class="container">
+            <a class="brand" href="/">PlacementDB</a>
+            <nav class="site-nav" aria-label="Primary">
+                <ul>
+                    <li><a href="/questions">Questions</a></li>
+                    <li><a href="/experiences">Experiences</a></li>
+                    <li><a href="/search">Search</a></li>
+                    <li><a href="/submit/question">Submit</a></li>
+                    <li><a href="/moderation/queue" aria-current="page">Moderation <span class="badge">3</span></a></li>
+                    <li><a href="/u/mod_alice">Profile</a></li>
+                    <li>
+                        <form class="nav-form" method="post" action="/auth/logout">
+                            <input type="hidden" name="_csrf" value="csrf-token-example">
+                            <button type="submit" class="link-button">Log out</button>
+                        </form>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    <main id="main" tabindex="-1">
+        <div class="container">
+            <nav class="breadcrumbs" aria-label="Breadcrumb">
+                <ol>
+                    <li><a href="/moderation/queue">Moderation queue</a></li>
+                    <li aria-current="page">Lowest common ancestor in a binary tree</li>
+                </ol>
+            </nav>
+            <header class="page-header">
+                <h1>Review: Lowest common ancestor in a binary tree</h1>
+                <p class="meta">Type: question &middot; Current state: <span class="state state-pending_review">pending_review</span></p>
+            </header>
+            <p><a href="/questions/binary-tree-lca">View the public page (if published)</a></p>
+            <section aria-labelledby="content-heading">
+                <h2 id="content-heading">Content</h2>
+                <div class="prose">Given the root of a binary tree and two nodes, find the lowest common ancestor. Assume each node has a parent pointer. Discuss the time and space tradeoffs.</div>
+                <h3>Answer guidance</h3>
+                <div class="prose">Two common approaches: storing visited ancestors in a set, or aligning depths and walking up. Mention which is faster and why.</div>
+            </section>
+            <section aria-labelledby="history-heading">
+                <h2 id="history-heading">Audit history</h2>
+                <ol class="history">
+                    <li>
+                        <span class="meta">2026-08-07 &middot; ridhi_s</span><br>
+                        <span class="state state-draft">draft</span>
+                        to
+                        <span class="state state-pending_review">pending_review</span>
+                    </li>
+                </ol>
+            </section>
+            <section aria-labelledby="action-heading">
+                <h2 id="action-heading">Decision</h2>
+                <p>Every action needs a non-empty reason, including approval. The reason is stored on the audit event and cannot be edited later.</p>
+                <form method="post" action="/moderation/items/01J8XN2C7QK9V3ZB1M4T5R6PWC/action">
+                    <input type="hidden" name="_csrf" value="csrf-token-example">
+                    <input type="hidden" name="expected_state" value="pending_review">
+                    <fieldset>
+                        <legend>Action</legend>
+                        <label><input type="radio" name="action" value="approve" required> Approve</label>
+                        <label><input type="radio" name="action" value="request_changes"> Request changes</label>
+                        <label><input type="radio" name="action" value="reject"> Reject</label>
+                    </fieldset>
+                    <p>
+                        <label for="reason">Reason <span aria-hidden="true">*</span></label>
+                        <textarea id="reason" name="reason" required minlength="5" maxlength="1000" rows="4" aria-describedby="reason-help"></textarea>
+                        <span id="reason-help" class="help">Explain why you are taking this action. Required for approve, request changes, reject, hide, and restore.</span>
+                    </p>
+                    <button type="submit">Submit decision</button>
+                </form>
+            </section>
+        </div>
+    </main>
+    <footer class="site-footer">
+        <div class="container">
+            <p>PlacementDB is a community question bank for SRM students. Moderators review every submission before it appears.</p>
+            <p><a href="/about">About</a> &middot; <a href="/about/moderation">Moderation policy</a> &middot; <a href="/about/accessibility">Accessibility</a></p>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<%layout layouts/base %>
+<%c++
+    using Row = std::unordered_map<std::string, std::string>;
+    using RowList = std::vector<Row>;
+    auto field = [](const Row &row, const std::string &key) -> std::string {
+        auto it = row.find(key);
+        return it == row.end() ? std::string() : it->second;
+    };
+    auto items = @@.getPtr<RowList>("items");
+    auto filters = @@.get<std::unordered_map<std::string, std::string>>("filters");
+    auto page = @@.get<std::string>("page");
+    auto total_pages = @@.get<std::string>("total_pages");
+    auto query_base = @@.get<std::string>("query_base");
+    auto total = @@.get<std::string>("total");
+    int page_n = std::max(1, std::atoi(page.c_str()));
+    int tp_n = std::max(1, std::atoi(total_pages.c_str()));
+    auto fv = [&](const std::string &key) -> std::string {
+        return filters.count(key) ? filters.at(key) : std::string();
+    };
+%>
+<header class="page-header">
+    <h1>Moderation queue</h1>
+    <p class="lede">[[ total ]] items awaiting review. Every decision needs a reason and is recorded in the audit log.</p>
+</header>
+
+<form class="filters" action="/moderation/queue" method="get" aria-label="Filter moderation queue">
+    <fieldset class="filter-group">
+        <legend>Type</legend>
+        <label><input type="radio" name="target_type" value=""<%c++ if (fv("target_type").empty()) { %> checked<%c++ } %>> All</label>
+        <label><input type="radio" name="target_type" value="question"<%c++ if (fv("target_type") == "question") { %> checked<%c++ } %>> Questions</label>
+        <label><input type="radio" name="target_type" value="experience"<%c++ if (fv("target_type") == "experience") { %> checked<%c++ } %>> Experiences</label>
+    </fieldset>
+    <fieldset class="filter-group">
+        <legend>State</legend>
+        <label><input type="radio" name="state" value="pending_review"<%c++ if (fv("state") == "pending_review" || fv("state").empty()) { %> checked<%c++ } %>> Pending review</label>
+        <label><input type="radio" name="state" value="changes_requested"<%c++ if (fv("state") == "changes_requested") { %> checked<%c++ } %>> Changes requested</label>
+    </fieldset>
+    <div class="filter-actions">
+        <button type="submit">Apply filters</button>
+        <a class="secondary" href="/moderation/queue">Clear filters</a>
+    </div>
+</form>
+
+<%c++ if (items && !items->empty()) { %>
+<table class="list-table">
+    <caption class="visually-hidden">Moderation queue, page [[ page ]]</caption>
+    <thead>
+        <tr>
+            <th scope="col">Title</th>
+            <th scope="col">Type</th>
+            <th scope="col">Author</th>
+            <th scope="col">Submitted</th>
+            <th scope="col">State</th>
+            <th scope="col">Action</th>
+        </tr>
+    </thead>
+    <tbody>
+<%c++ for (const auto &i : *items) { %>
+        <tr>
+            <th scope="row">[[ field(i, "title") ]]</th>
+            <td>[[ field(i, "target_type") ]]</td>
+            <td><%c++ if (field(i, "author_label").empty()) { %>Anonymous<%c++ } else { %>[[ field(i, "author_label") ]]<%c++ } %></td>
+            <td>[[ field(i, "submitted_at") ]]</td>
+            <td><span class="state state-[[ field(i, "state") ]]">[[ field(i, "state") ]]</span></td>
+            <td><a href="/moderation/items/[[ field(i, "id") ]]">Review</a></td>
+        </tr>
+<%c++ } %>
+    </tbody>
+</table>
+<%c++ } else { %>
+<p>The queue is empty. Nice work.</p>
+<%c++ } %>
+
+<%c++ if (tp_n > 1) { %>
+<nav class="pagination" aria-label="Pagination">
+<%c++ if (page_n > 1) { %>
+    <a href="/moderation/queue?[[ query_base ]]&page=[[ std::to_string(page_n - 1) ]]" rel="prev">Previous page</a>
+<%c++ } %>
+    <span aria-current="page">Page [[ page ]]</span>
+<%c++ if (page_n < tp_n) { %>
+    <a href="/moderation/queue?[[ query_base ]]&page=[[ std::to_string(page_n + 1) ]]" rel="next">Next page</a>
+<%c++ } %>
+</nav>
+<%c++ } %>
+<p class="alt"><a href="/moderation/reports">Open reports</a> &middot; <a href="/moderation/audit">Audit log</a></p>

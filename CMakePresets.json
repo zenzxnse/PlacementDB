@@ -1,0 +1,93 @@
+{
+  "version": 8,
+  "cmakeMinimumRequired": {
+    "major": 4,
+    "minor": 0,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "linux-base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "BUILD_TESTING": "ON",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "linux-dev",
+      "inherits": "linux-base",
+      "displayName": "Linux development",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "linux-release",
+      "inherits": "linux-base",
+      "displayName": "Linux release",
+      "cacheVariables": {
+        "BUILD_TESTING": "OFF",
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "linux-strict",
+      "inherits": "linux-base",
+      "displayName": "Linux warnings as errors",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "PLACEDB_WARNINGS_AS_ERRORS": "ON"
+      }
+    },
+    {
+      "name": "linux-asan",
+      "inherits": "linux-base",
+      "displayName": "Linux AddressSanitizer",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "PLACEDB_ENABLE_ASAN": "ON"
+      }
+    },
+    {
+      "name": "linux-ubsan",
+      "inherits": "linux-base",
+      "displayName": "Linux UndefinedBehaviorSanitizer",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "PLACEDB_ENABLE_UBSAN": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "linux-dev", "configurePreset": "linux-dev", "jobs": 1 },
+    { "name": "linux-release", "configurePreset": "linux-release", "jobs": 1 },
+    { "name": "linux-strict", "configurePreset": "linux-strict", "jobs": 1 },
+    { "name": "linux-asan", "configurePreset": "linux-asan", "jobs": 1 },
+    { "name": "linux-ubsan", "configurePreset": "linux-ubsan", "jobs": 1 }
+  ],
+  "testPresets": [
+    {
+      "name": "linux-test-base",
+      "hidden": true,
+      "output": { "outputOnFailure": true },
+      "execution": {
+        "jobs": 1,
+        "noTestsAction": "error",
+        "stopOnFailure": true
+      }
+    },
+    { "name": "linux-dev", "inherits": "linux-test-base", "configurePreset": "linux-dev" },
+    { "name": "linux-release", "inherits": "linux-test-base", "configurePreset": "linux-release" },
+    { "name": "linux-strict", "inherits": "linux-test-base", "configurePreset": "linux-strict" },
+    { "name": "linux-asan", "inherits": "linux-test-base", "configurePreset": "linux-asan" },
+    { "name": "linux-ubsan", "inherits": "linux-test-base", "configurePreset": "linux-ubsan" }
+  ]
+}

@@ -1,0 +1,123 @@
+<%layout layouts/base %>
+<%c++
+    using Row = std::unordered_map<std::string, std::string>;
+    auto field = [](const Row &row, const std::string &key) -> std::string {
+        auto it = row.find(key);
+        return it == row.end() ? std::string() : it->second;
+    };
+    auto item = @@.get<Row>("item");
+    auto can_vote = @@.get<std::string>("can_vote") == "true";
+    auto self_vote_blocked = @@.get<std::string>("self_vote_blocked") == "true";
+    auto is_author = @@.get<std::string>("is_author") == "true";
+    auto can_report = @@.get<std::string>("can_report") == "true";
+    auto current_vote = @@.getPtr<std::string>("current_vote_value");
+    auto csrf = @@.get<std::string>("csrf_token");
+    auto slug = field(item, "slug");
+    auto opaque_id = field(item, "id");
+%>
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+    <ol>
+        <li><a href="/questions">Questions</a></li>
+        <li aria-current="page">[[ field(item, "title") ]]</li>
+    </ol>
+</nav>
+
+<article>
+    <h1>[[ field(item, "title") ]]</h1>
+    <p class="meta">
+<%c++ if (!field(item, "company").empty()) { %>Company: [[ field(item, "company") ]] &middot; <%c++ } %>
+<%c++ if (!field(item, "role_title").empty()) { %>Role: [[ field(item, "role_title") ]] &middot; <%c++ } %>
+<%c++ if (!field(item, "round").empty()) { %>Round: [[ field(item, "round") ]] &middot; <%c++ } %>
+<%c++ if (!field(item, "source_year").empty()) { %>Year: [[ field(item, "source_year") ]] &middot; <%c++ } %>
+<%c++ if (!field(item, "published_at").empty()) { %>Published: [[ field(item, "published_at") ]]<%c++ } %>
+    </p>
+<%c++ if (!field(item, "topics").empty()) { %>
+    <p class="topics">Topics: [[ field(item, "topics") ]]</p>
+<%c++ } %>
+<%c++ if (!field(item, "difficulty_aggregate").empty()) { %>
+    <p class="difficulty">Difficulty: [[ field(item, "difficulty_aggregate") ]] (out of 5, [[ field(item, "vote_count") ]] votes)</p>
+<%c++ } else { %>
+    <p class="difficulty">Difficulty: not rated yet</p>
+<%c++ } %>
+
+    <section aria-labelledby="prompt-heading">
+        <h2 id="prompt-heading">Prompt</h2>
+        <div class="prose">[[ field(item, "prompt") ]]</div>
+    </section>
+<%c++ if (!field(item, "answer_guidance").empty()) { %>
+    <section aria-labelledby="guidance-heading">
+        <h2 id="guidance-heading">Answer guidance</h2>
+        <div class="prose">[[ field(item, "answer_guidance") ]]</div>
+    </section>
+<%c++ } %>
+
+    <footer class="item-footer">
+        <p>Posted by
+<%c++ if (field(item, "anonymous") == "true") { %>
+            Anonymous
+<%c++ } else if (!field(item, "author_label").empty()) { %>
+            <a href="/u/[[ field(item, "author_username") ]]">[[ field(item, "author_label") ]]</a>
+<%c++ } else { %>
+            a community member
+<%c++ } %>
+<%c++ if (!field(item, "published_at").empty()) { %> on [[ field(item, "published_at") ]]<%c++ } %>
+        </p>
+<%c++ if (is_author) { %>
+        <p><a href="/submit/question?edit=[[ slug ]]">Edit your submission</a></p>
+<%c++ } %>
+    </footer>
+</article>
+
+<%c++ if (self_vote_blocked) { %>
+<section class="notice" aria-label="Voting">
+    <p>You cannot vote on the difficulty of your own question.</p>
+</section>
+<%c++ } else if (can_vote) { %>
+<section class="vote" aria-labelledby="vote-heading">
+    <h2 id="vote-heading">Rate the difficulty</h2>
+    <p>Choose a value from 1 (easy) to 5 (hard). Your vote replaces any previous vote.</p>
+    <form method="post" action="/questions/[[ slug ]]/vote">
+        <input type="hidden" name="_csrf" value="[[ csrf ]]">
+        <fieldset>
+            <legend>Difficulty (1 to 5)</legend>
+            <div class="vote-options">
+<%c++ for (int v = 1; v <= 5; ++v) { %>
+                <label><input type="radio" name="value" value="[[ std::to_string(v) ]]"<%c++ if (current_vote && *current_vote == std::to_string(v)) { %> checked<%c++ } %>> [[ std::to_string(v) ]]</label>
+<%c++ } %>
+            </div>
+        </fieldset>
+        <button type="submit">Save vote</button>
+    </form>
+<%c++ if (current_vote && !current_vote->empty()) { %>
+    <form method="post" action="/questions/[[ slug ]]/vote/clear">
+        <input type="hidden" name="_csrf" value="[[ csrf ]]">
+        <button type="submit" class="secondary">Clear my vote</button>
+    </form>
+<%c++ } %>
+</section>
+<%c++ } %>
+
+<%c++ if (can_report) { %>
+<section class="report" aria-labelledby="report-heading">
+    <details>
+        <summary id="report-heading">Report this question</summary>
+        <form method="post" action="/reports">
+            <input type="hidden" name="_csrf" value="[[ csrf ]]">
+            <input type="hidden" name="target_type" value="question">
+            <input type="hidden" name="target_id" value="[[ opaque_id ]]">
+            <label for="report-reason">Reason <span aria-hidden="true">*</span></label>
+            <select id="report-reason" name="reason" required>
+                <option value="">Select a reason</option>
+                <option value="spam">Spam or self-promotion</option>
+                <option value="offensive">Offensive or harassing content</option>
+                <option value="wrong-company">Wrong company or metadata</option>
+                <option value="duplicates">Duplicates an existing question</option>
+                <option value="other">Other</option>
+            </select>
+            <label for="report-details">Details (optional)</label>
+            <textarea id="report-details" name="details" maxlength="1000"></textarea>
+            <button type="submit">Send report</button>
+        </form>
+    </details>
+</section>
+<%c++ } %>

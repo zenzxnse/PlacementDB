@@ -1,0 +1,79 @@
+<%layout layouts/base %>
+<%c++
+    using Row = std::unordered_map<std::string, std::string>;
+    using RowList = std::vector<Row>;
+    auto field = [](const Row &row, const std::string &key) -> std::string {
+        auto it = row.find(key);
+        return it == row.end() ? std::string() : it->second;
+    };
+    auto items = @@.getPtr<RowList>("items");
+    auto filters = @@.get<std::unordered_map<std::string, std::string>>("filters");
+    auto csrf = @@.get<std::string>("csrf_token");
+    auto page = @@.get<std::string>("page");
+    auto total_pages = @@.get<std::string>("total_pages");
+    int page_n = std::max(1, std::atoi(page.c_str()));
+    int tp_n = std::max(1, std::atoi(total_pages.c_str()));
+    auto fv = [&](const std::string &key) -> std::string {
+        return filters.count(key) ? filters.at(key) : std::string();
+    };
+%>
+<header class="page-header">
+    <h1>Reports</h1>
+    <p class="lede">Community reports. A report never automatically hides content.</p>
+</header>
+
+<form class="filters" action="/moderation/reports" method="get" aria-label="Filter reports">
+    <fieldset class="filter-group">
+        <legend>State</legend>
+        <label><input type="radio" name="state" value="open"<%c++ if (fv("state") == "open" || fv("state").empty()) { %> checked<%c++ } %>> Open</label>
+        <label><input type="radio" name="state" value="under_review"<%c++ if (fv("state") == "under_review") { %> checked<%c++ } %>> Under review</label>
+        <label><input type="radio" name="state" value="resolved"<%c++ if (fv("state") == "resolved") { %> checked<%c++ } %>> Resolved</label>
+        <label><input type="radio" name="state" value="dismissed"<%c++ if (fv("state") == "dismissed") { %> checked<%c++ } %>> Dismissed</label>
+    </fieldset>
+    <div class="filter-actions">
+        <button type="submit">Apply filters</button>
+    </div>
+</form>
+
+<%c++ if (items && !items->empty()) { %>
+<table class="list-table">
+    <caption class="visually-hidden">Reports</caption>
+    <thead>
+        <tr><th scope="col">Target</th><th scope="col">Reason</th><th scope="col">State</th><th scope="col">Filed</th><th scope="col">Resolve</th></tr>
+    </thead>
+    <tbody>
+<%c++ for (const auto &r : *items) { %>
+        <tr>
+            <th scope="row"><a href="/[[ field(r, "target_type") ]]s/[[ field(r, "slug") ]]">[[ field(r, "title") ]]</a></th>
+            <td>[[ field(r, "reason") ]]</td>
+            <td><span class="state state-[[ field(r, "state") ]]">[[ field(r, "state") ]]</span></td>
+            <td>[[ field(r, "created_at") ]]</td>
+            <td>
+                <form method="post" action="/moderation/reports/[[ field(r, "id") ]]/resolve" class="inline-form">
+                    <input type="hidden" name="_csrf" value="[[ csrf ]]">
+                    <label for="note-[[ field(r, "id") ]]">Resolution note</label>
+                    <input type="text" id="note-[[ field(r, "id") ]]" name="resolution_note" maxlength="500">
+                    <label><input type="radio" name="state" value="resolved" checked> Resolved</label>
+                    <label><input type="radio" name="state" value="dismissed"> Dismissed</label>
+                    <button type="submit">Save</button>
+                </form>
+            </td>
+        </tr>
+<%c++ } %>
+    </tbody>
+</table>
+<%c++ } else { %>
+<p>No reports in this state.</p>
+<%c++ } %>
+
+<%c++ if (tp_n > 1) { %>
+<nav class="pagination" aria-label="Pagination">
+<%c++ if (page_n > 1) { %>
+    <a href="/moderation/reports?state=[[ fv("state") ]]&page=[[ std::to_string(page_n - 1) ]]" rel="prev">Previous page</a>
+<%c++ } %>
+    <span aria-current="page">Page [[ page ]]</span>
+<%c++ if (page_n < tp_n) { %>
+    <a href="/moderation/reports?state=[[ fv("state") ]]&page=[[ std::to_string(page_n + 1) ]]" rel="next">Next page</a>
+<%c++ } %>
+</nav>
+<%c++ } %>

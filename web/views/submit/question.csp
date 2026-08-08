@@ -1,0 +1,124 @@
+<%inc#include "views/escaped_text.h" %>
+<%inc#include "views/safe_url.h" %>
+<%inc#include "views/view_types.h" %>
+<%inc#include "views/question_form_model.h" %>
+<%layout layouts/base %>
+<%c++
+    const auto &action_url = @@.get<SafeUrl>("action_url");
+    const auto &csrf_token = @@.get<EscapedText>("csrf_token");
+    auto is_edit = @@.get<bool>("is_edit");
+    const auto &title = @@.get<EscapedText>("title");
+    const auto &prompt = @@.get<EscapedText>("prompt");
+    const auto &answer_guidance = @@.get<EscapedText>("answer_guidance");
+    const auto &source_year = @@.get<std::optional<int>>("source_year");
+    const auto &companies = @@.get<std::vector<SelectOption>>("companies");
+    const auto &roles = @@.get<std::vector<SelectOption>>("roles");
+    const auto &topics = @@.get<std::vector<SelectOption>>("topics");
+    const auto &rounds = @@.get<std::vector<SelectOption>>("rounds");
+    const auto &errors = @@.get<FormErrors>("errors");
+
+    auto field_error = [&](const char *fid) -> const EscapedText * {
+        for (const auto &fe : errors.fields) {
+            if (fe.field_id.value() == fid) return &fe.message;
+        }
+        return nullptr;
+    };
+    const EscapedText *title_err = field_error("title");
+    const EscapedText *company_err = field_error("company");
+    const EscapedText *role_err = field_error("role");
+    const EscapedText *round_err = field_error("round");
+    const EscapedText *source_year_err = field_error("source_year");
+    const EscapedText *topics_err = field_error("topics");
+    const EscapedText *prompt_err = field_error("prompt");
+    const EscapedText *answer_guidance_err = field_error("answer_guidance");
+%>
+<h1><%c++ if (is_edit) { %>Edit question<%c++ } else { %>Submit a question<%c++ } %></h1>
+<p>Fields marked with <span aria-hidden="true">*</span> are required. Submissions are reviewed by a moderator before being published.</p>
+<%c++ if (errors.summary.has_value()) { %>
+<div id="error-summary" role="alert" tabindex="-1" autofocus>
+    <p>{% errors.summary->value() %}</p>
+    <ul>
+<%c++     for (const auto &fe : errors.fields) { %>
+        <li><a href="#{% fe.field_id.value() %}">{% fe.message.value() %}</a></li>
+<%c++     } %>
+    </ul>
+</div>
+<%c++ } %>
+<form method="post" action="{% action_url.value() %}">
+    <input type="hidden" name="_csrf" value="{% csrf_token.value() %}">
+    <div>
+        <label for="title">Title <span aria-hidden="true">*</span></label>
+<%c++     if (title_err) { %>
+        <p class="error" id="title-error" role="alert">{% title_err->value() %}</p>
+<%c++     } %>
+        <input type="text" id="title" name="title" value="{% title.value() %}" required minlength="8" maxlength="200"<%c++ if (title_err) { %> aria-describedby="title-error"<%c++ } %>>
+    </div>
+    <div>
+        <label for="company">Company</label>
+<%c++     if (company_err) { %>
+        <p class="error" id="company-error" role="alert">{% company_err->value() %}</p>
+<%c++     } %>
+        <select id="company" name="company"<%c++ if (company_err) { %> aria-describedby="company-error"<%c++ } %>>
+            <option value="">(company-agnostic)</option>
+<%c++         for (const auto &opt : companies) { %>
+            <option value="{% opt.value.value() %}"<%c++ if (opt.selected) { %> selected<%c++ } %>>{% opt.label.value() %}</option>
+<%c++         } %>
+        </select>
+    </div>
+    <div>
+        <label for="role">Role</label>
+<%c++     if (role_err) { %>
+        <p class="error" id="role-error" role="alert">{% role_err->value() %}</p>
+<%c++     } %>
+        <select id="role" name="role"<%c++ if (role_err) { %> aria-describedby="role-error"<%c++ } %>>
+<%c++         for (const auto &opt : roles) { %>
+            <option value="{% opt.value.value() %}"<%c++ if (opt.selected) { %> selected<%c++ } %>>{% opt.label.value() %}</option>
+<%c++         } %>
+        </select>
+    </div>
+    <div>
+        <label for="round">Round</label>
+<%c++     if (round_err) { %>
+        <p class="error" id="round-error" role="alert">{% round_err->value() %}</p>
+<%c++     } %>
+        <select id="round" name="round"<%c++ if (round_err) { %> aria-describedby="round-error"<%c++ } %>>
+<%c++         for (const auto &opt : rounds) { %>
+            <option value="{% opt.value.value() %}"<%c++ if (opt.selected) { %> selected<%c++ } %>>{% opt.label.value() %}</option>
+<%c++         } %>
+        </select>
+    </div>
+    <div>
+        <label for="source_year">Source year <span aria-hidden="true">*</span></label>
+<%c++     if (source_year_err) { %>
+        <p class="error" id="source_year-error" role="alert">{% source_year_err->value() %}</p>
+<%c++     } %>
+        <input type="number" id="source_year" name="source_year" min="2000" max="2027" required<%c++ if (source_year.has_value()) { %> value="{% std::to_string(source_year.value()) %}"<%c++ } %><%c++ if (source_year_err) { %> aria-describedby="source_year-error"<%c++ } %>>
+    </div>
+    <fieldset>
+        <legend>Topics</legend>
+<%c++     if (topics_err) { %>
+        <p class="error" id="topics-error" role="alert">{% topics_err->value() %}</p>
+<%c++     } %>
+<%c++     for (const auto &opt : topics) { %>
+        <label><input type="checkbox" name="topics" value="{% opt.value.value() %}"<%c++ if (opt.selected) { %> checked<%c++ } %>> {% opt.label.value() %}</label>
+<%c++     } %>
+    </fieldset>
+    <div>
+        <label for="prompt">Prompt <span aria-hidden="true">*</span></label>
+<%c++     if (prompt_err) { %>
+        <p class="error" id="prompt-error" role="alert">{% prompt_err->value() %}</p>
+<%c++     } %>
+        <textarea id="prompt" name="prompt" required minlength="20" maxlength="8000" rows="8"<%c++ if (prompt_err) { %> aria-describedby="prompt-error"<%c++ } %>>{% prompt.value() %}</textarea>
+    </div>
+    <div>
+        <label for="answer_guidance">Answer guidance</label>
+<%c++     if (answer_guidance_err) { %>
+        <p class="error" id="answer_guidance-error" role="alert">{% answer_guidance_err->value() %}</p>
+<%c++     } %>
+        <textarea id="answer_guidance" name="answer_guidance" maxlength="8000" rows="6"<%c++ if (answer_guidance_err) { %> aria-describedby="answer_guidance-error"<%c++ } %>>{% answer_guidance.value() %}</textarea>
+    </div>
+    <div>
+        <button type="submit" name="action" value="submit">Submit for review</button>
+        <button type="submit" name="action" value="save_draft">Save as draft</button>
+    </div>
+</form>

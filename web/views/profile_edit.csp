@@ -1,0 +1,39 @@
+<%inc#include "views/escaped_text.h" %>
+<%inc#include "views/safe_url.h" %>
+<%inc#include "views/view_types.h" %>
+<%inc#include "views/profile_edit_model.h" %>
+<%layout layouts/base %>
+<%c++
+    auto action_url = @@.get<SafeUrl>("action_url");
+    auto csrf_token = @@.get<EscapedText>("csrf_token");
+    auto display_name = @@.get<EscapedText>("display_name");
+    auto errors = @@.get<FormErrors>("errors");
+    const FieldError* dn_err = nullptr;
+    for (const auto &fe : errors.fields) {
+        if (fe.field_id.value() == "display_name") {
+            dn_err = &fe;
+        }
+    }
+%>
+<header class="page-header">
+    <h1>Edit your profile</h1>
+</header>
+
+<%c++ if (errors.summary.has_value()) { %>
+<div class="error-summary" role="alert" tabindex="-1" id="error-summary" autofocus>
+    <h2>Check your input</h2>
+    <p>{% errors.summary.value().value() %}</p>
+</div>
+<%c++ } %>
+
+<form method="post" action="{% action_url.value() %}" novalidate>
+    <input type="hidden" name="_csrf" value="{% csrf_token.value() %}">
+    <p>
+        <label for="display_name">Display name <span aria-hidden="true">*</span></label>
+        <input type="text" id="display_name" name="display_name" value="{% display_name.value() %}" required minlength="2" maxlength="60" autocomplete="name"<%c++ if (dn_err) { %> aria-invalid="true" aria-describedby="display_name-error"<%c++ } %>>
+<%c++ if (dn_err) { %>
+        <span id="display_name-error" class="field-error">{% dn_err->message.value() %}</span>
+<%c++ } %>
+    </p>
+    <button type="submit">Save profile</button>
+</form>

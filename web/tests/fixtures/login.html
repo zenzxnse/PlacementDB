@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Log in - PlacementDB</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header class="site-header">
+        <div class="container">
+            <a class="brand" href="/">PlacementDB</a>
+            <nav class="site-nav" aria-label="Primary">
+                <ul>
+                    <li><a href="/questions">Questions</a></li>
+                    <li><a href="/experiences">Experiences</a></li>
+                    <li><a href="/search">Search</a></li>
+                    <li><a href="/login" aria-current="page">Log in</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    <main id="main" tabindex="-1">
+        <div class="container">
+            <header class="page-header">
+                <h1>Log in</h1>
+            </header>
+            <div class="error-summary" role="alert" tabindex="-1" id="error-summary" autofocus>
+                <h2>Check your input</h2>
+                <p>Email or password is incorrect.</p>
+                <ul>
+                    <li><a href="#password">Password: must be at least 12 characters</a></li>
+                </ul>
+            </div>
+            <form method="post" action="/auth/login" novalidate>
+                <input type="hidden" name="_csrf" value="csrf-token-example">
+                <p>
+                    <label for="identifier">Email or username</label>
+                    <input type="text" id="identifier" name="identifier" value="" autocomplete="username" required maxlength="254" aria-invalid="true" aria-describedby="identifier-error">
+                    <span id="identifier-error" class="field-error">This field is required</span>
+                </p>
+                <p>
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" autocomplete="current-password" required minlength="12" maxlength="256" aria-invalid="true" aria-describedby="password-error">
+                    <span id="password-error" class="field-error">must be at least 12 characters</span>
+                </p>
+                <button type="submit">Log in</button>
+            </form>
+        </div>
+    </main>
+    <footer class="site-footer">
+        <div class="container">
+            <p>PlacementDB is a community question bank for SRM students. Moderators review every submission before it appears.</p>
+        </div>
+    </footer>
+</body>
+</html>

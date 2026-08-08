@@ -1,0 +1,57 @@
+<%layout layouts/base %>
+<%c++
+    using Row = std::unordered_map<std::string, std::string>;
+    using RowList = std::vector<Row>;
+    auto field = [](const Row &row, const std::string &key) -> std::string {
+        auto it = row.find(key);
+        return it == row.end() ? std::string() : it->second;
+    };
+    auto items = @@.getPtr<RowList>("items");
+    auto page = @@.get<std::string>("page");
+    auto total_pages = @@.get<std::string>("total_pages");
+    auto query_base = @@.get<std::string>("query_base");
+    int page_n = std::max(1, std::atoi(page.c_str()));
+    int tp_n = std::max(1, std::atoi(total_pages.c_str()));
+%>
+<header class="page-header">
+    <h1>Your reports</h1>
+    <p>Reports you have filed and their current state. A report never automatically hides content.</p>
+</header>
+
+<%c++ if (items && !items->empty()) { %>
+<table class="list-table">
+    <caption class="visually-hidden">Your reports</caption>
+    <thead>
+        <tr>
+            <th scope="col">Target</th>
+            <th scope="col">Reason</th>
+            <th scope="col">State</th>
+            <th scope="col">Filed</th>
+        </tr>
+    </thead>
+    <tbody>
+<%c++ for (const auto &r : *items) { %>
+        <tr>
+            <th scope="row"><a href="/[[ field(r, "target_type") ]]s/[[ field(r, "slug") ]]">[[ field(r, "title") ]]</a></th>
+            <td>[[ field(r, "reason") ]]</td>
+            <td><span class="state state-[[ field(r, "state") ]]">[[ field(r, "state") ]]</span></td>
+            <td>[[ field(r, "created_at") ]]</td>
+        </tr>
+<%c++ } %>
+    </tbody>
+</table>
+<%c++ } else { %>
+<p>You have not filed any reports.</p>
+<%c++ } %>
+
+<%c++ if (tp_n > 1) { %>
+<nav class="pagination" aria-label="Pagination">
+<%c++ if (page_n > 1) { %>
+    <a href="/account/reports?[[ query_base ]]&page=[[ std::to_string(page_n - 1) ]]" rel="prev">Previous page</a>
+<%c++ } %>
+    <span aria-current="page">Page [[ page ]]</span>
+<%c++ if (page_n < tp_n) { %>
+    <a href="/account/reports?[[ query_base ]]&page=[[ std::to_string(page_n + 1) ]]" rel="next">Next page</a>
+<%c++ } %>
+</nav>
+<%c++ } %>

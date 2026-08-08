@@ -1,0 +1,67 @@
+<%inc#include "views/escaped_text.h" %>
+<%inc#include "views/safe_url.h" %>
+<%inc#include "views/view_types.h" %>
+<%inc#include "views/search_model.h" %>
+<%layout layouts/base %>
+<%c++
+    auto query = @@.get<EscapedText>("query");
+    auto items = @@.get<std::vector<SearchResult>>("items");
+    auto total = @@.get<uint64_t>("total");
+    auto total_is_estimate = @@.get<bool>("total_is_estimate");
+    auto search_unavailable = @@.get<bool>("search_unavailable");
+    auto unavailable_message_ptr = @@.getPtr<EscapedText>("unavailable_message");
+    auto pagination = @@.get<PageLinks>("pagination");
+    auto kind_label = [](ContentKind k) -> const char* {
+        return k == ContentKind::Question ? "question" : "experience";
+    };
+%>
+<header class="page-header">
+    <h1>Search</h1>
+</header>
+
+<form class="search-form" action="/search" method="get" role="search" aria-label="Search questions and experiences">
+    <label for="q">Search terms</label>
+    <input type="search" id="q" name="q" value="{% query.value() %}">
+    <button type="submit">Search</button>
+</form>
+
+<%c++ if (search_unavailable) { %>
+<section class="notice notice-warn" aria-live="polite">
+    <h2>Search is temporarily unavailable</h2>
+<%c++ if (unavailable_message_ptr) { %>
+    <p>{% unavailable_message_ptr->value() %}</p>
+<%c++ } else { %>
+    <p>The search index is not responding right now. You can still browse questions and experiences.</p>
+<%c++ } %>
+    <p><a href="/questions">Browse questions</a> &middot; <a href="/experiences">Browse experiences</a></p>
+</section>
+<%c++ } else if (!query.value().empty()) { %>
+<section aria-label="Results">
+    <p class="result-count"><%c++ if (total_is_estimate) { %>About <%c++ } %>{% total %} results</p>
+<%c++ if (!items.empty()) { %>
+    <ul class="result-list">
+<%c++ for (const auto &item : items) { %>
+        <li>
+            <h2><a href="{% item.detail_url.value() %}">{% item.title.value() %}</a></h2>
+            <p class="meta">{% item.company.value() %} &middot; {% item.source_year %} &middot; {% kind_label(item.kind) %}</p>
+            <p class="snippet">{% item.snippet.value() %}</p>
+        </li>
+<%c++ } %>
+    </ul>
+<%c++ } else { %>
+    <p>No results matched your search. Try different or fewer words.</p>
+<%c++ } %>
+</section>
+<%c++ if (pagination.previous.has_value() || pagination.next.has_value()) { %>
+<nav class="pagination" aria-label="Pagination">
+<%c++ if (pagination.previous.has_value()) { %>
+    <a href="{% pagination.previous.value().value() %}" rel="prev">Previous page</a>
+<%c++ } %>
+<%c++ if (pagination.next.has_value()) { %>
+    <a href="{% pagination.next.value().value() %}" rel="next">Next page</a>
+<%c++ } %>
+</nav>
+<%c++ } %>
+<%c++ } else { %>
+<p class="lede">Type a query above and press Search. Results cover published questions and experiences only.</p>
+<%c++ } %>

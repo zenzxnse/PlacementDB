@@ -1,0 +1,153 @@
+<%layout layouts/base %>
+<%c++
+    using Row = std::unordered_map<std::string, std::string>;
+    using RowList = std::vector<Row>;
+    auto field = [](const Row &row, const std::string &key) -> std::string {
+        auto it = row.find(key);
+        return it == row.end() ? std::string() : it->second;
+    };
+    auto split_lines = [](const std::string &s) -> std::vector<std::string> {
+        std::vector<std::string> out;
+        std::string cur;
+        for (char c : s) { if (c == '\n') { if (!cur.empty()) out.push_back(cur); cur.clear(); } else cur.push_back(c); }
+        if (!cur.empty()) out.push_back(cur);
+        return out;
+    };
+    auto contains = [](const std::vector<std::string> &v, const std::string &k) -> bool {
+        for (const auto &s : v) { if (s == k) return true; } return false;
+    };
+    auto items = @@.getPtr<RowList>("items");
+    auto filters = @@.get<std::unordered_map<std::string, std::string>>("filters");
+    auto filter_options = @@.get<std::unordered_map<std::string, std::string>>("filter_options");
+    auto sort = @@.get<std::string>("sort");
+    auto page = @@.get<std::string>("page");
+    auto total_pages = @@.get<std::string>("total_pages");
+    auto next_cursor = @@.getPtr<std::string>("next_cursor");
+    auto query_base = @@.get<std::string>("query_base");
+    auto total = @@.get<std::string>("total");
+    auto total_is_estimate = @@.getPtr<std::string>("total_is_estimate");
+    bool est = total_is_estimate && *total_is_estimate == "true";
+    int page_n = std::max(1, std::atoi(page.c_str()));
+    int tp_n = std::max(1, std::atoi(total_pages.c_str()));
+    auto cur_topics = split_lines(filters.count("topics") ? filters.at("topics") : "");
+    auto cur_companies = split_lines(filters.count("companies") ? filters.at("companies") : "");
+    auto cur_roles = split_lines(filters.count("roles") ? filters.at("roles") : "");
+    auto cur_years = split_lines(filters.count("years") ? filters.at("years") : "");
+    auto cur_difficulty = split_lines(filters.count("difficulty") ? filters.at("difficulty") : "");
+    auto opt_topics = split_lines(filter_options.count("topics") ? filter_options.at("topics") : "");
+    auto opt_companies = split_lines(filter_options.count("companies") ? filter_options.at("companies") : "");
+    auto opt_roles = split_lines(filter_options.count("roles") ? filter_options.at("roles") : "");
+    auto opt_years = split_lines(filter_options.count("years") ? filter_options.at("years") : "");
+    auto opt_difficulty = split_lines(filter_options.count("difficulty") ? filter_options.at("difficulty") : "");
+%>
+<header class="page-header">
+    <h1>Questions</h1>
+    <p class="lede"><%c++ if (est) { %>About <%c++ } %>[[ total ]] published questions.</p>
+</header>
+
+<form class="filters" action="/questions" method="get" aria-label="Filter questions">
+    <fieldset class="filter-group">
+        <legend>Sort</legend>
+        <label for="sort"><span class="visually-hidden">Sort by</span></label>
+        <select id="sort" name="sort">
+            <option value="hot"<%c++ if (sort == "hot") { %> selected<%c++ } %>>Hot</option>
+            <option value="new"<%c++ if (sort == "new") { %> selected<%c++ } %>>New</option>
+            <option value="top"<%c++ if (sort == "top") { %> selected<%c++ } %>>Top</option>
+        </select>
+    </fieldset>
+<%c++ if (!opt_companies.empty()) { %>
+    <fieldset class="filter-group">
+        <legend>Company</legend>
+<%c++ for (const auto &v : opt_companies) { %>
+        <label><input type="checkbox" name="company" value="[[ v ]]"<%c++ if (contains(cur_companies, v)) { %> checked<%c++ } %>> [[ v ]]</label>
+<%c++ } %>
+    </fieldset>
+<%c++ } %>
+<%c++ if (!opt_roles.empty()) { %>
+    <fieldset class="filter-group">
+        <legend>Role</legend>
+<%c++ for (const auto &v : opt_roles) { %>
+        <label><input type="checkbox" name="role" value="[[ v ]]"<%c++ if (contains(cur_roles, v)) { %> checked<%c++ } %>> [[ v ]]</label>
+<%c++ } %>
+    </fieldset>
+<%c++ } %>
+<%c++ if (!opt_topics.empty()) { %>
+    <fieldset class="filter-group">
+        <legend>Topic</legend>
+<%c++ for (const auto &v : opt_topics) { %>
+        <label><input type="checkbox" name="topic" value="[[ v ]]"<%c++ if (contains(cur_topics, v)) { %> checked<%c++ } %>> [[ v ]]</label>
+<%c++ } %>
+    </fieldset>
+<%c++ } %>
+<%c++ if (!opt_years.empty()) { %>
+    <fieldset class="filter-group">
+        <legend>Year</legend>
+<%c++ for (const auto &v : opt_years) { %>
+        <label><input type="checkbox" name="year" value="[[ v ]]"<%c++ if (contains(cur_years, v)) { %> checked<%c++ } %>> [[ v ]]</label>
+<%c++ } %>
+    </fieldset>
+<%c++ } %>
+<%c++ if (!opt_difficulty.empty()) { %>
+    <fieldset class="filter-group">
+        <legend>Difficulty (1 to 5)</legend>
+<%c++ for (const auto &v : opt_difficulty) { %>
+        <label><input type="checkbox" name="difficulty" value="[[ v ]]"<%c++ if (contains(cur_difficulty, v)) { %> checked<%c++ } %>> [[ v ]]</label>
+<%c++ } %>
+    </fieldset>
+<%c++ } %>
+    <div class="filter-actions">
+        <button type="submit">Apply filters</button>
+        <a class="secondary" href="/questions?sort=[[ sort ]]">Clear filters</a>
+    </div>
+</form>
+
+<section aria-label="Results">
+<%c++ if (items && !items->empty()) { %>
+    <table class="list-table">
+        <caption class="visually-hidden">Published questions, page [[ page ]]</caption>
+        <thead>
+            <tr>
+                <th scope="col">Title</th>
+                <th scope="col">Company</th>
+                <th scope="col">Role</th>
+                <th scope="col">Round</th>
+                <th scope="col">Year</th>
+                <th scope="col">Difficulty</th>
+            </tr>
+        </thead>
+        <tbody>
+<%c++ for (const auto &q : *items) { %>
+            <tr>
+                <th scope="row"><a href="/questions/[[ field(q, "slug") ]]">[[ field(q, "title") ]]</a></th>
+                <td>[[ field(q, "company") ]]</td>
+                <td>[[ field(q, "role_title") ]]</td>
+                <td>[[ field(q, "round") ]]</td>
+                <td>[[ field(q, "source_year") ]]</td>
+                <td><%c++ if (!field(q, "difficulty_aggregate").empty()) { %>[[ field(q, "difficulty_aggregate") ]] ([[ field(q, "vote_count") ]])<%c++ } else { %>Not rated<%c++ } %></td>
+            </tr>
+<%c++ } %>
+        </tbody>
+    </table>
+<%c++ } else { %>
+    <p>No questions match these filters yet. Try clearing filters or <a href="/submit/question">submit one</a>.</p>
+<%c++ } %>
+</section>
+
+<nav class="pagination" aria-label="Pagination">
+<%c++ if (page_n > 1) { %>
+    <a href="/questions?[[ query_base ]]&page=[[ std::to_string(page_n - 1) ]]" rel="prev">Previous page</a>
+<%c++ } %>
+<%c++ for (int i = 1; i <= tp_n && i <= 200; ++i) { %>
+<%c++ if (i == page_n) { %>
+    <span aria-current="page">[[ std::to_string(i) ]]</span>
+<%c++ } else { %>
+    <a href="/questions?[[ query_base ]]&page=[[ std::to_string(i) ]]"<%c++ if (i == page_n + 1) { %> rel="next"<%c++ } %>>[[ std::to_string(i) ]]</a>
+<%c++ } %>
+<%c++ } %>
+<%c++ if (next_cursor && !next_cursor->empty() && (sort == "hot" || sort == "top")) { %>
+    <a href="/questions?[[ query_base ]]&after=[[ *next_cursor ]]" rel="next">Older</a>
+<%c++ } else if (page_n < tp_n && tp_n <= 200) { %>
+    <a href="/questions?[[ query_base ]]&page=[[ std::to_string(page_n + 1) ]]" rel="next">Next page</a>
+<%c++ } %>
+</nav>
+<p class="page-meta">Page [[ page ]] of [[ total_pages ]].</p>

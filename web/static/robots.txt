@@ -1,0 +1,19 @@
+User-agent: *
+Allow: /$
+Allow: /questions
+Allow: /questions/
+Allow: /experiences
+Allow: /experiences/
+Allow: /search
+Allow: /u/
+Allow: /about
+Allow: /sitemap.xml
+Disallow: /submit
+Disallow: /moderation
+Disallow: /account
+Disallow: /auth
+Disallow: /me
+Disallow: /reports
+Disallow: /admin
+
+Sitemap: https://placementdb.example/sitemap.xml

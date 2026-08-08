@@ -1,0 +1,60 @@
+<%layout layouts/base %>
+<%c++
+    using Row = std::unordered_map<std::string, std::string>;
+    using RowList = std::vector<Row>;
+    auto field = [](const Row &row, const std::string &key) -> std::string {
+        auto it = row.find(key);
+        return it == row.end() ? std::string() : it->second;
+    };
+    auto items = @@.getPtr<RowList>("items");
+    auto page = @@.get<std::string>("page");
+    auto total_pages = @@.get<std::string>("total_pages");
+    auto query_base = @@.get<std::string>("query_base");
+    auto total = @@.get<std::string>("total");
+    int page_n = std::max(1, std::atoi(page.c_str()));
+    int tp_n = std::max(1, std::atoi(total_pages.c_str()));
+%>
+<header class="page-header">
+    <h1>Experiences</h1>
+    <p class="lede">[[ total ]] published placement experiences. Authors can keep their name or the outcome hidden.</p>
+</header>
+
+<section aria-label="Results">
+<%c++ if (items && !items->empty()) { %>
+    <ul class="result-list">
+<%c++ for (const auto &e : *items) { %>
+        <li>
+            <h2><a href="/experiences/[[ field(e, "slug") ]]">[[ field(e, "title") ]]</a></h2>
+            <p class="meta">
+<%c++ if (!field(e, "company").empty()) { %>Company: [[ field(e, "company") ]] &middot; <%c++ } %>
+<%c++ if (!field(e, "role_title").empty()) { %>Role: [[ field(e, "role_title") ]] &middot; <%c++ } %>
+<%c++ if (!field(e, "source_year").empty()) { %>Year: [[ field(e, "source_year") ]] &middot; <%c++ } %>
+<%c++ if (field(e, "anonymous") == "true") { %>Anonymous<%c++ } else if (!field(e, "author_label").empty()) { %>[[ field(e, "author_label") ]]<%c++ } %>
+            </p>
+<%c++ if (!field(e, "snippet").empty()) { %>
+            <p class="snippet">[[ field(e, "snippet") ]]</p>
+<%c++ } %>
+        </li>
+<%c++ } %>
+    </ul>
+<%c++ } else { %>
+    <p>No experiences have been published yet. <a href="/submit/experience">Share your experience</a>.</p>
+<%c++ } %>
+</section>
+
+<nav class="pagination" aria-label="Pagination">
+<%c++ if (page_n > 1) { %>
+    <a href="/experiences?[[ query_base ]]&page=[[ std::to_string(page_n - 1) ]]" rel="prev">Previous page</a>
+<%c++ } %>
+<%c++ for (int i = 1; i <= tp_n && i <= 200; ++i) { %>
+<%c++ if (i == page_n) { %>
+    <span aria-current="page">[[ std::to_string(i) ]]</span>
+<%c++ } else { %>
+    <a href="/experiences?[[ query_base ]]&page=[[ std::to_string(i) ]]"<%c++ if (i == page_n + 1) { %> rel="next"<%c++ } %>>[[ std::to_string(i) ]]</a>
+<%c++ } %>
+<%c++ } %>
+<%c++ if (page_n < tp_n && tp_n <= 200) { %>
+    <a href="/experiences?[[ query_base ]]&page=[[ std::to_string(page_n + 1) ]]" rel="next">Next page</a>
+<%c++ } %>
+</nav>
+<p class="page-meta">Page [[ page ]] of [[ total_pages ]].</p>

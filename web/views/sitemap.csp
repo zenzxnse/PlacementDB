@@ -1,0 +1,18 @@
+<%inc#include "views/escaped_text.h" %>
+<%inc#include "views/safe_url.h" %>
+<%inc#include "views/view_types.h" %>
+<%inc#include "views/sitemap_model.h" %>
+<?xml version="1.0" encoding="UTF-8"?>
+<%c++
+    auto urls = @@.get<std::vector<SitemapEntry>>("urls");
+%>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<%c++ for (const auto &e : urls) { %>
+    <url>
+        <loc>{% e.location.value() %}</loc>
+<%c++ if (e.last_modified.has_value()) { %>
+        <lastmod>{% e.last_modified->value() %}</lastmod>
+<%c++ } %>
+    </url>
+<%c++ } %>
+</urlset>

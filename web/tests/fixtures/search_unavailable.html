@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Search - PlacementDB</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <meta name="request-id" content="01J8XN2C7QK9V3ZB1M4T5R6PWD">
+</head>
+<body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header class="site-header">
+        <div class="container">
+            <a class="brand" href="/">PlacementDB</a>
+            <nav class="site-nav" aria-label="Primary">
+                <ul>
+                    <li><a href="/questions">Questions</a></li>
+                    <li><a href="/experiences">Experiences</a></li>
+                    <li><a href="/search" aria-current="page">Search</a></li>
+                    <li><a href="/login">Log in</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    <main id="main" tabindex="-1">
+        <div class="container">
+            <header class="page-header">
+                <h1>Search</h1>
+            </header>
+            <form class="search-form" action="/search" method="get" role="search" aria-label="Search questions and experiences">
+                <label for="q">Search terms</label>
+                <input type="search" id="q" name="q" value="linked list" autocomplete="off" required>
+                <button type="submit">Search</button>
+            </form>
+            <section class="notice notice-warn" aria-live="polite">
+                <h2>Search is temporarily unavailable</h2>
+                <p>The search index is not responding right now. You can still browse questions and experiences.</p>
+                <p><a href="/questions">Browse questions</a> &middot; <a href="/experiences">Browse experiences</a></p>
+            </section>
+        </div>
+    </main>
+    <footer class="site-footer">
+        <div class="container">
+            <p>PlacementDB is a community question bank for SRM students. Moderators review every submission before it appears.</p>
+            <p><a href="/about">About</a> &middot; <a href="/about/moderation">Moderation policy</a> &middot; <a href="/about/accessibility">Accessibility</a></p>
+        </div>
+    </footer>
+</body>
+</html>

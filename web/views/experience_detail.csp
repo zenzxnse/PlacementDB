@@ -1,0 +1,94 @@
+<%layout layouts/base %>
+<%c++
+    using Row = std::unordered_map<std::string, std::string>;
+    auto field = [](const Row &row, const std::string &key) -> std::string {
+        auto it = row.find(key);
+        return it == row.end() ? std::string() : it->second;
+    };
+    auto item = @@.get<Row>("item");
+    auto csrf = @@.get<std::string>("csrf_token");
+    auto can_report = @@.get<std::string>("can_report") == "true";
+    auto slug = field(item, "slug");
+    auto opaque_id = field(item, "id");
+    auto rounds = field(item, "rounds");
+    auto split_lines = [](const std::string &s) -> std::vector<std::string> {
+        std::vector<std::string> out;
+        std::string cur;
+        for (char c : s) { if (c == '\n') { if (!cur.empty()) out.push_back(cur); cur.clear(); } else cur.push_back(c); }
+        if (!cur.empty()) out.push_back(cur);
+        return out;
+    };
+    auto round_lines = split_lines(rounds);
+%>
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+    <ol>
+        <li><a href="/experiences">Experiences</a></li>
+        <li aria-current="page">[[ field(item, "title") ]]</li>
+    </ol>
+</nav>
+
+<article>
+    <h1>[[ field(item, "title") ]]</h1>
+    <p class="meta">
+<%c++ if (!field(item, "company").empty()) { %>Company: [[ field(item, "company") ]] &middot; <%c++ } %>
+<%c++ if (!field(item, "role_title").empty()) { %>Role: [[ field(item, "role_title") ]] &middot; <%c++ } %>
+<%c++ if (!field(item, "source_year").empty()) { %>Year: [[ field(item, "source_year") ]] &middot; <%c++ } %>
+<%c++ if (!field(item, "published_at").empty()) { %>Published: [[ field(item, "published_at") ]]<%c++ } %>
+    </p>
+
+    <footer class="item-footer">
+        <p>Posted by
+<%c++ if (field(item, "anonymous") == "true") { %>
+            Anonymous
+<%c++ } else if (!field(item, "author_label").empty()) { %>
+            <a href="/u/[[ field(item, "author_username") ]]">[[ field(item, "author_label") ]]</a>
+<%c++ } else { %>
+            a community member
+<%c++ } %>
+        </p>
+    </footer>
+
+<%c++ if (field(item, "outcome_visible") == "true" && !field(item, "outcome").empty()) { %>
+    <p class="outcome">Outcome: [[ field(item, "outcome") ]]</p>
+<%c++ } %>
+
+    <section aria-labelledby="narrative-heading">
+        <h2 id="narrative-heading">Narrative</h2>
+        <div class="prose">[[ field(item, "narrative") ]]</div>
+    </section>
+<%c++ if (!round_lines.empty()) { %>
+    <section aria-labelledby="rounds-heading">
+        <h2 id="rounds-heading">Rounds</h2>
+        <ol class="rounds">
+<%c++ for (const auto &r : round_lines) { %>
+            <li>[[ r ]]</li>
+<%c++ } %>
+        </ol>
+    </section>
+<%c++ } %>
+</article>
+
+<%c++ if (can_report) { %>
+<section class="report" aria-labelledby="report-heading">
+    <details>
+        <summary id="report-heading">Report this experience</summary>
+        <form method="post" action="/reports">
+            <input type="hidden" name="_csrf" value="[[ csrf ]]">
+            <input type="hidden" name="target_type" value="experience">
+            <input type="hidden" name="target_id" value="[[ opaque_id ]]">
+            <label for="report-reason">Reason <span aria-hidden="true">*</span></label>
+            <select id="report-reason" name="reason" required>
+                <option value="">Select a reason</option>
+                <option value="spam">Spam or self-promotion</option>
+                <option value="offensive">Offensive or harassing content</option>
+                <option value="private-data">Reveals private data</option>
+                <option value="duplicates">Duplicates an existing experience</option>
+                <option value="other">Other</option>
+            </select>
+            <label for="report-details">Details (optional)</label>
+            <textarea id="report-details" name="details" maxlength="1000"></textarea>
+            <button type="submit">Send report</button>
+        </form>
+    </details>
+</section>
+<%c++ } %>

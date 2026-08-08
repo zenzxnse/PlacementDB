@@ -1,0 +1,90 @@
+<%inc#include "views/escaped_text.h" %>
+<%inc#include "views/safe_url.h" %>
+<%inc#include "views/view_types.h" %>
+<%inc#include "views/layout_model.h" %>
+<!DOCTYPE html>
+<html lang="en">
+<%c++
+    auto page_title = @@.get<EscapedText>("page_title");
+    auto canonical = @@.getPtr<SafeUrl>("canonical_url");
+    auto request_id = @@.getPtr<EscapedText>("request_id");
+    auto flash_msg = @@.getPtr<EscapedText>("flash_message");
+    auto flash_cls = @@.get<TrustedCssClass>("flash_class");
+    auto user = @@.getPtr<CurrentUserModel>("current_user");
+    auto nav = @@.get<NavSection>("nav_section");
+    auto logout_csrf = @@.getPtr<EscapedText>("logout_csrf_token");
+    auto nav_aria = [](NavSection s, NavSection active) -> const char* {
+        return s == active ? " aria-current=\"page\"" : "";
+    };
+    auto flash_class_str = [](TrustedCssClass c) -> const char* {
+        switch (c) {
+            case TrustedCssClass::FlashSuccess: return "flash-success";
+            case TrustedCssClass::FlashNotice: return "flash-info";
+            case TrustedCssClass::FlashError: return "flash-error";
+            default: return "";
+        }
+    };
+%>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% page_title.value() %}</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<%c++ if (canonical) { %>
+    <link rel="canonical" href="{% canonical->value() %}">
+<%c++ } %>
+<%c++ if (request_id) { %>
+    <meta name="request-id" content="{% request_id->value() %}">
+<%c++ } %>
+</head>
+<body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header class="site-header">
+        <div class="container">
+            <a class="brand" href="/"<%c++ $$ << nav_aria(NavSection::Home, nav); %>>PlacementDB</a>
+            <nav class="site-nav" aria-label="Primary">
+                <ul>
+                    <li><a href="/questions"<%c++ $$ << nav_aria(NavSection::Questions, nav); %>>Questions</a></li>
+                    <li><a href="/experiences"<%c++ $$ << nav_aria(NavSection::Experiences, nav); %>>Experiences</a></li>
+                    <li><a href="/search"<%c++ $$ << nav_aria(NavSection::Search, nav); %>>Search</a></li>
+<%c++ if (user) { %>
+<%c++ if (user->can_submit) { %>
+                    <li><a href="/submit/question"<%c++ $$ << nav_aria(NavSection::Submit, nav); %>>Submit</a></li>
+<%c++ } %>
+<%c++ if (user->can_moderate) { %>
+                    <li><a href="/moderation/queue"<%c++ $$ << nav_aria(NavSection::Moderation, nav); %>>Moderation<%c++ if (user->unread_moderation_count > 0) { %> <span class="badge">{% std::to_string(user->unread_moderation_count) %}</span><%c++ } %></a></li>
+<%c++ } %>
+                    <li><a href="{% user->profile_url.value() %}"<%c++ $$ << nav_aria(NavSection::Profile, nav); %>>Profile</a></li>
+                    <li>
+                        <form class="nav-form" method="post" action="/logout">
+<%c++ if (logout_csrf) { %>
+                            <input type="hidden" name="_csrf" value="{% logout_csrf->value() %}">
+<%c++ } %>
+                            <button type="submit" class="link-button">Log out</button>
+                        </form>
+                    </li>
+<%c++ } else { %>
+                    <li><a href="/login">Log in</a></li>
+<%c++ } %>
+                </ul>
+            </nav>
+        </div>
+    </header>
+<%c++ if (flash_msg) { %>
+    <div class="flash <%c++ $$ << flash_class_str(flash_cls); %>" role="status" aria-live="polite">
+        <div class="container">{% flash_msg->value() %}</div>
+    </div>
+<%c++ } %>
+    <main id="main" tabindex="-1">
+        <div class="container">
+            [[]]
+        </div>
+    </main>
+    <footer class="site-footer">
+        <div class="container">
+            <p>PlacementDB is a community question bank for SRM students. Moderators review every submission before it appears.</p>
+        </div>
+    </footer>
+</body>
+</html>

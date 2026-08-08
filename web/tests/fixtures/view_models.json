@@ -1,0 +1,116 @@
+{
+  "_comment": "Synthetic browser fixture payloads mirroring the CSP view-model contract. No real student identities, no copied interview content. These are for the WCAG 2.2 AA structural checker; they are not loaded by any application build.",
+  "_review_status": "Reconstructed by GLM on 2026-08-07 to match the rendered HTML fixtures in this directory.",
+  "home": {
+    "page_title": "PlacementDB - SRM placement questions",
+    "canonical_url": "https://placementdb.example/",
+    "nav_active": "home",
+    "hot_questions": [
+      { "slug": "reverse-linked-list", "title": "Reverse a linked list in place", "company": "Acme Corp", "source_year": "2024", "difficulty_aggregate": "3.4", "vote_count": "12" },
+      { "slug": "binary-tree-lca", "title": "Lowest common ancestor in a binary tree", "company": "Globex", "source_year": "2023", "difficulty_aggregate": "4.1", "vote_count": "9" },
+      { "slug": "two-sum-variants", "title": "Two sum variants with constraints", "company": "Initech", "source_year": "2024", "difficulty_aggregate": "2.7", "vote_count": "21" }
+    ],
+    "new_questions": [
+      { "slug": "sliding-window-max", "title": "Sliding window maximum with a deque", "company": "Umbrella", "source_year": "2026" },
+      { "slug": "lru-cache-design", "title": "Design an LRU cache", "company": "Hooli", "source_year": "2026" }
+    ],
+    "recent_experiences": [
+      { "slug": "acme-onsite-2024", "title": "Acme Corp onsite, three rounds", "company": "Acme Corp", "anonymous": "false", "author_label": "ridhi_s" },
+      { "slug": "globex-summer-intern", "title": "Globex summer intern process", "company": "Globex", "anonymous": "true", "author_label": "" }
+    ]
+  },
+  "questions_list": {
+    "page_title": "Questions - PlacementDB",
+    "request_id": "01J8XN2C7QK9V3ZB1M4T5R6PWA",
+    "nav_active": "questions",
+    "items": [
+      { "slug": "reverse-linked-list", "title": "Reverse a linked list in place", "company": "Acme Corp", "role_title": "SDE 1", "round": "Tech", "source_year": "2024", "difficulty_aggregate": "3.4", "vote_count": "12" },
+      { "slug": "binary-tree-lca", "title": "Lowest common ancestor in a binary tree", "company": "Globex", "role_title": "SDE Intern", "round": "Online assessment", "source_year": "2023", "difficulty_aggregate": "4.1", "vote_count": "9" },
+      { "slug": "two-sum-variants", "title": "Two sum variants with constraints", "company": "Initech", "role_title": "SDE 1", "round": "Tech", "source_year": "2024", "difficulty_aggregate": "2.7", "vote_count": "21" }
+    ],
+    "page": "1",
+    "per_page": "20",
+    "total": "42",
+    "total_pages": "4",
+    "next_cursor": "",
+    "total_is_estimate": "false",
+    "sort": "hot",
+    "filters": { "topics": "arrays", "years": "2024" },
+    "filter_options": { "topics": "arrays\ntrees\ndp", "years": "2024\n2023" },
+    "query_base": "sort=hot&topic=arrays"
+  },
+  "question_detail": {
+    "page_title": "Reverse a linked list in place - PlacementDB",
+    "canonical_url": "https://placementdb.example/questions/reverse-linked-list",
+    "request_id": "01J8XN2C7QK9V3ZB1M4T5R6PWA",
+    "nav_active": "questions",
+    "csrf_token": "csrf-token-example",
+    "current_user_username": "ridhi_s",
+    "current_user_display_name": "Ridhi S",
+    "current_user_role": "user",
+    "item": {
+      "id": "01J8XN2C7QK9V3ZB1M4T5R6PWA",
+      "slug": "reverse-linked-list",
+      "title": "Reverse a linked list in place",
+      "company": "Acme Corp",
+      "role_title": "SDE 1",
+      "round": "Tech",
+      "source_year": "2024",
+      "topics": "arrays, linked lists",
+      "difficulty_aggregate": "3.4",
+      "vote_count": "12",
+      "published_at": "2026-08-01",
+      "prompt": "Given the head of a singly linked list, reverse the list in place and return the new head. Do not allocate extra memory. Handle the empty list and single node cases.",
+      "answer_guidance": "Walk through pointer manipulation step by step. Mention the time and space complexity. A common follow up asks for reversing a sublist between two indices.",
+      "anonymous": "false",
+      "author_label": "ridhi_s",
+      "author_username": "ridhi_s"
+    },
+    "can_vote": "true",
+    "current_vote_value": "3",
+    "self_vote_blocked": "false",
+    "is_author": "false",
+    "can_report": "true"
+  },
+  "moderation_detail": {
+    "page_title": "Review: Lowest common ancestor in a binary tree - PlacementDB",
+    "request_id": "01J8XN2C7QK9V3ZB1M4T5R6PWB",
+    "nav_active": "moderation",
+    "csrf_token": "csrf-token-example",
+    "current_user_username": "mod_alice",
+    "current_user_display_name": "Alice (moderator)",
+    "current_user_role": "moderator",
+    "current_user_unread_moderation_count": "3",
+    "item": {
+      "id": "01J8XN2C7QK9V3ZB1M4T5R6PWC",
+      "slug": "binary-tree-lca",
+      "title": "Lowest common ancestor in a binary tree",
+      "target_type": "question",
+      "state": "pending_review",
+      "prompt": "Given the root of a binary tree and two nodes, find the lowest common ancestor. Assume each node has a parent pointer. Discuss the time and space tradeoffs.",
+      "answer_guidance": "Two common approaches: storing visited ancestors in a set, or aligning depths and walking up. Mention which is faster and why."
+    },
+    "actions": [
+      { "action": "approve", "label": "Approve", "requires_reason": "true" },
+      { "action": "request_changes", "label": "Request changes", "requires_reason": "true" },
+      { "action": "reject", "label": "Reject", "requires_reason": "true" }
+    ],
+    "history": [
+      { "actor_label": "ridhi_s", "previous_state": "draft", "new_state": "pending_review", "reason": "", "created_at": "2026-08-07" }
+    ]
+  },
+  "search_unavailable": {
+    "page_title": "Search - PlacementDB",
+    "request_id": "01J8XN2C7QK9V3ZB1M4T5R6PWD",
+    "nav_active": "search",
+    "filters": { "q": "linked list" },
+    "search_unavailable": "true"
+  },
+  "error": {
+    "page_title": "404 - PlacementDB",
+    "status": "404",
+    "code": "NOT_FOUND",
+    "message": "The page you asked for is not published or is not visible to you.",
+    "request_id": "01J8XN2C7QK9V3ZB1M4T5R6PWE"
+  }
+}

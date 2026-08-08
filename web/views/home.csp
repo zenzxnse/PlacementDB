@@ -1,0 +1,80 @@
+<%inc#include "views/escaped_text.h" %>
+<%inc#include "views/safe_url.h" %>
+<%inc#include "views/view_types.h" %>
+<%inc#include "views/home_model.h" %>
+<%inc#include <iomanip> %>
+<%inc#include <sstream> %>
+<%inc#include <string> %>
+<%layout layouts/base %>
+<%c++
+    auto hot = @@.get<std::vector<HomeQuestion>>("hot_questions");
+    auto fresh = @@.get<std::vector<HomeQuestion>>("new_questions");
+    auto recent = @@.get<std::vector<HomeExperience>>("recent_experiences");
+    auto fmt1 = [](double d) -> std::string {
+        std::ostringstream ss;
+        ss << std::fixed << std::setprecision(1) << d;
+        return ss.str();
+    };
+%>
+<section class="intro">
+    <h1>Placement questions from SRM students</h1>
+    <p>Browse, search, and share interview experiences. Moderators review every submission before it appears.</p>
+    <p>
+        <a href="/questions">Browse all questions</a>
+        &middot;
+        <a href="/experiences">Read experiences</a>
+        &middot;
+        <a href="/submit/question">Submit a question</a>
+    </p>
+</section>
+
+<section aria-labelledby="hot-heading">
+    <h2 id="hot-heading">Hot questions</h2>
+<%c++ if (!hot.empty()) { %>
+    <ul class="link-list">
+<%c++ for (const auto &q : hot) { %>
+        <li>
+            <a href="{% q.detail_url.value() %}">{% q.title.value() %}</a>
+            <span class="meta"><%c++ if (!q.company.value().empty()) { $$ << q.company.value(); %> &middot; <%c++ } %><%c++ $$ << q.source_year; %><%c++ if (q.difficulty_mean.has_value()) { %> &middot; Difficulty <%c++ $$ << fmt1(q.difficulty_mean.value()); %> (<%c++ $$ << q.difficulty_vote_count; %> votes)<%c++ } %></span>
+        </li>
+<%c++ } %>
+    </ul>
+    <p><a href="/questions?sort=hot">See more hot questions</a></p>
+<%c++ } else { %>
+    <p>No questions have reached the hot feed yet. <a href="/questions">Browse all questions</a> or <a href="/submit/question">submit the first one</a>.</p>
+<%c++ } %>
+</section>
+
+<section aria-labelledby="new-heading">
+    <h2 id="new-heading">New questions</h2>
+<%c++ if (!fresh.empty()) { %>
+    <ul class="link-list">
+<%c++ for (const auto &q : fresh) { %>
+        <li>
+            <a href="{% q.detail_url.value() %}">{% q.title.value() %}</a>
+            <span class="meta"><%c++ if (!q.company.value().empty()) { $$ << q.company.value(); %> &middot; <%c++ } %><%c++ $$ << q.source_year; %></span>
+        </li>
+<%c++ } %>
+    </ul>
+    <p><a href="/questions?sort=new">See more new questions</a></p>
+<%c++ } else { %>
+    <p>No questions have been published yet.</p>
+<%c++ } %>
+</section>
+
+<section aria-labelledby="exp-heading">
+    <h2 id="exp-heading">Recent experiences</h2>
+<%c++ if (!recent.empty()) { %>
+    <ul class="link-list">
+<%c++ for (const auto &e : recent) { %>
+        <li>
+            <a href="{% e.detail_url.value() %}">{% e.title.value() %}</a>
+            <span class="meta"><%c++ if (!e.company.value().empty()) { $$ << e.company.value(); %> &middot; <%c++ } %><%c++ if (e.is_anonymous) { %>Anonymous<%c++ } else { $$ << e.author_label.value(); } %></span>
+        </li>
+<%c++ } %>
+    </ul>
+    <p><a href="/experiences">See more experiences</a></p>
+<%c++ } else { %>
+    <p>No experiences have been published yet. <a href="/submit/experience">Share your experience</a>.</p>
+<%c++ } %>
+</section>

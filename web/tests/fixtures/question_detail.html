@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Reverse a linked list in place - PlacementDB</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <link rel="canonical" href="https://placementdb.example/questions/reverse-linked-list">
+    <meta name="request-id" content="01J8XN2C7QK9V3ZB1M4T5R6PWA">
+</head>
+<body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header class="site-header">
+        <div class="container">
+            <a class="brand" href="/">PlacementDB</a>
+            <nav class="site-nav" aria-label="Primary">
+                <ul>
+                    <li><a href="/questions" aria-current="page">Questions</a></li>
+                    <li><a href="/experiences">Experiences</a></li>
+                    <li><a href="/search">Search</a></li>
+                    <li><a href="/submit/question">Submit</a></li>
+                    <li><a href="/u/ridhi_s">Profile</a></li>
+                    <li>
+                        <form class="nav-form" method="post" action="/auth/logout">
+                            <input type="hidden" name="_csrf" value="csrf-token-example">
+                            <button type="submit" class="link-button">Log out</button>
+                        </form>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    <main id="main" tabindex="-1">
+        <div class="container">
+            <nav class="breadcrumbs" aria-label="Breadcrumb">
+                <ol>
+                    <li><a href="/questions">Questions</a></li>
+                    <li aria-current="page">Reverse a linked list in place</li>
+                </ol>
+            </nav>
+            <article>
+                <h1>Reverse a linked list in place</h1>
+                <p class="meta">
+                    Company: Acme Corp &middot; Role: SDE 1 &middot; Round: Tech &middot; Year: 2024 &middot; Published: 2026-08-01
+                </p>
+                <p class="topics">Topics: arrays, linked lists</p>
+                <p class="difficulty">Difficulty: 3.4 (out of 5, 12 votes)</p>
+                <section aria-labelledby="prompt-heading">
+                    <h2 id="prompt-heading">Prompt</h2>
+                    <div class="prose">Given the head of a singly linked list, reverse the list in place and return the new head. Do not allocate extra memory. Handle the empty list and single node cases.</div>
+                </section>
+                <section aria-labelledby="guidance-heading">
+                    <h2 id="guidance-heading">Answer guidance</h2>
+                    <div class="prose">Walk through pointer manipulation step by step. Mention the time and space complexity. A common follow up asks for reversing a sublist between two indices.</div>
+                </section>
+                <footer class="item-footer">
+                    <p>Posted by <a href="/u/ridhi_s">ridhi_s</a> on 2026-08-01</p>
+                </footer>
+            </article>
+            <section class="vote" aria-labelledby="vote-heading">
+                <h2 id="vote-heading">Rate the difficulty</h2>
+                <p>Choose a value from 1 (easy) to 5 (hard). Your vote replaces any previous vote.</p>
+                <form method="post" action="/questions/reverse-linked-list/vote">
+                    <input type="hidden" name="_csrf" value="csrf-token-example">
+                    <fieldset>
+                        <legend>Difficulty (1 to 5)</legend>
+                        <div class="vote-options">
+                            <label><input type="radio" name="value" value="1"> 1</label>
+                            <label><input type="radio" name="value" value="2"> 2</label>
+                            <label><input type="radio" name="value" value="3" checked> 3</label>
+                            <label><input type="radio" name="value" value="4"> 4</label>
+                            <label><input type="radio" name="value" value="5"> 5</label>
+                        </div>
+                    </fieldset>
+                    <button type="submit">Save vote</button>
+                </form>
+                <form method="post" action="/questions/reverse-linked-list/vote/clear">
+                    <input type="hidden" name="_csrf" value="csrf-token-example">
+                    <button type="submit" class="secondary">Clear my vote</button>
+                </form>
+            </section>
+            <section class="report" aria-labelledby="report-heading">
+                <details>
+                    <summary id="report-heading">Report this question</summary>
+                    <form method="post" action="/reports">
+                        <input type="hidden" name="_csrf" value="csrf-token-example">
+                        <input type="hidden" name="target_type" value="question">
+                        <input type="hidden" name="target_id" value="01J8XN2C7QK9V3ZB1M4T5R6PWA">
+                        <label for="report-reason">Reason <span aria-hidden="true">*</span></label>
+                        <select id="report-reason" name="reason" required>
+                            <option value="">Select a reason</option>
+                            <option value="spam">Spam or self-promotion</option>
+                            <option value="offensive">Offensive or harassing content</option>
+                            <option value="wrong-company">Wrong company or metadata</option>
+                            <option value="duplicates">Duplicates an existing question</option>
+                            <option value="other">Other</option>
+                        </select>
+                        <label for="report-details">Details (optional)</label>
+                        <textarea id="report-details" name="details" maxlength="1000"></textarea>
+                        <button type="submit">Send report</button>
+                    </form>
+                </details>
+            </section>
+        </div>
+    </main>
+    <footer class="site-footer">
+        <div class="container">
+            <p>PlacementDB is a community question bank for SRM students. Moderators review every submission before it appears.</p>
+            <p><a href="/about">About</a> &middot; <a href="/about/moderation">Moderation policy</a> &middot; <a href="/about/accessibility">Accessibility</a></p>
+        </div>
+    </footer>
+</body>
+</html>
