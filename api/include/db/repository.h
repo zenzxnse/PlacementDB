@@ -37,9 +37,11 @@ class QuestionRepository {
         std::int64_t author_id,
         std::optional<std::int64_t> company_id,
         const std::string& slug,
+        const std::string& title,
         const std::string& prompt,
         std::optional<std::string> answer_guidance,
         std::optional<std::string> role_title,
+        std::optional<std::int64_t> job_role_id,
         std::optional<std::string> round,
         std::optional<std::int16_t> source_year) const;
 
@@ -82,8 +84,11 @@ class ExperienceRepository {
         std::int64_t author_id,
         std::optional<std::int64_t> company_id,
         const std::string& slug,
+        const std::string& title,
         const std::string& narrative,
         std::optional<std::string> role_title,
+        std::optional<std::int64_t> job_role_id,
+        std::optional<std::int16_t> source_year,
         std::optional<std::string> outcome,
         bool outcome_visible,
         bool anonymous) const;
@@ -102,6 +107,24 @@ class ExperienceRepository {
         const std::string& reason,
         std::optional<std::string> request_id) const;
 
+  private:
+    std::shared_ptr<drogon::orm::DbClient> client_;
+};
+
+class UserRepository {
+  public:
+    explicit UserRepository(const std::shared_ptr<drogon::orm::DbClient>& client);
+    Result<UserRecord> FindById(std::int64_t id) const;
+    Result<UserRecord> FindLoginCandidate(const std::string& username) const;
+  private:
+    std::shared_ptr<drogon::orm::DbClient> client_;
+};
+
+class JobRoleRepository {
+  public:
+    explicit JobRoleRepository(const std::shared_ptr<drogon::orm::DbClient>& client);
+    Result<std::vector<JobRoleRecord>> List() const;
+    Result<JobRoleRecord> FindBySlug(const std::string& slug) const;
   private:
     std::shared_ptr<drogon::orm::DbClient> client_;
 };
@@ -190,6 +213,10 @@ class SessionRepository {
 
     Result<void> Touch(
         const std::string& token_hash) const;
+
+    Result<void> SetCsrfTokenHash(
+        const std::string& token_hash,
+        const std::string& csrf_token_hash) const;
 
     Result<void> DeleteByTokenHash(
         const std::string& token_hash) const;

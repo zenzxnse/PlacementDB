@@ -1,4 +1,38 @@
+/*
+ * Type system.
+ *
+ * Three roles, read off the reference layout rather than copied from it:
+ *
+ *   display  Large uppercase headings with tight tracking. The reference sets
+ *            these very big and splits emphasis by colour rather than weight.
+ *   body     Sentence-case reading text and form labels.
+ *   mono     Technical chrome: small uppercase tags, metadata, numeric
+ *            readouts, and code. In the reference this carries every label
+ *            like SCAN.RAW and CTRL.SYS, which is what makes the interface
+ *            read as instrumentation rather than decoration.
+ *
+ * Only Geist Mono ships with this repository. It is SIL Open Font License,
+ * self-hosted from static/fonts with its licence text beside it, so it needs
+ * no external host and satisfies font-src 'self' at the gateway.
+ *
+ * Lay Grotesk and Meso are named first for display and body so a machine with
+ * them legitimately installed uses them. Neither is bundled or downloaded:
+ * "Meso Trial" is a trial licence, which normally forbids web embedding, and
+ * Lay Grotesk is commercial. Shipping either would need a reviewed licence.
+ * Until then the fallbacks below carry the design.
+ */
+@font-face {
+	font-family: 'Geist Mono';
+	src: url('/fonts/GeistMono-Variable.woff2') format('woff2-variations');
+	font-weight: 100 900;
+	font-style: normal;
+	font-display: swap;
+}
+
 :root {
+	--font-display: 'Lay Grotesk', 'Meso Trial', 'Meso', Inter, 'Helvetica Neue', Arial, sans-serif;
+	--font-body: 'Meso Trial', 'Meso', 'Lay Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	--font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 	--bg: #ffffff;
 	--fg: #1a1a1a;
 	--muted: #555555;
@@ -36,9 +70,7 @@ body {
 	margin: 0;
 	background: var(--bg);
 	color: var(--fg);
-	font-family:
-		-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
-		sans-serif;
+	font-family: var(--font-body);
 	line-height: 1.5;
 }
 
@@ -148,18 +180,36 @@ main {
 }
 
 h1 {
-	font-size: 1.5rem;
-	line-height: 1.25;
+	font-family: var(--font-display);
+	/*
+	 * Uppercase with negative tracking, following the reference. Large
+	 * display type needs tighter spacing than body copy or the words drift
+	 * apart; the effect is the opposite at small sizes, which is why the
+	 * mono labels below go the other way.
+	 */
+	text-transform: uppercase;
+	letter-spacing: -0.02em;
+	font-size: clamp(1.75rem, 1.2rem + 2.2vw, 3rem);
+	line-height: 1.05;
+	font-weight: 600;
 	margin: 0.5rem 0 0.75rem;
 }
 
 h2 {
-	font-size: 1.15rem;
-	margin: 1.5rem 0 0.5rem;
+	font-family: var(--font-display);
+	text-transform: uppercase;
+	letter-spacing: -0.01em;
+	font-size: 1.35rem;
+	line-height: 1.15;
+	font-weight: 600;
+	margin: 1.75rem 0 0.5rem;
 }
 
 h3 {
+	font-family: var(--font-display);
 	font-size: 1rem;
+	font-weight: 600;
+	letter-spacing: 0;
 	margin: 1rem 0 0.5rem;
 }
 
@@ -167,9 +217,54 @@ p {
 	margin: 0.5rem 0;
 }
 
+/*
+ * Metadata line: company, year, round. Mono at a small size with positive
+ * tracking, which is the reference's treatment for anything that reads as a
+ * machine-produced fact rather than prose.
+ */
 .meta {
 	color: var(--muted);
-	font-size: 0.9rem;
+	font-family: var(--font-mono);
+	font-size: 0.8rem;
+	letter-spacing: 0.02em;
+}
+
+/* Small uppercase technical label, as used on the reference's corner tags. */
+.label-mono {
+	font-family: var(--font-mono);
+	font-size: 0.7rem;
+	text-transform: uppercase;
+	letter-spacing: 0.09em;
+	color: var(--muted);
+}
+
+code,
+pre,
+kbd,
+samp {
+	font-family: var(--font-mono);
+}
+
+/* Numeric columns read as data, and mono keeps digits aligned across rows. */
+table.data td:nth-child(4),
+table.data td:nth-child(5) {
+	font-family: var(--font-mono);
+	font-variant-numeric: tabular-nums;
+	font-size: 0.85rem;
+}
+
+table.data th {
+	font-family: var(--font-mono);
+	font-size: 0.72rem;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+}
+
+table.data caption {
+	font-family: var(--font-mono);
+	font-size: 0.72rem;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
 }
 
 .panel {
@@ -505,4 +600,366 @@ dl.facts dd {
 		transition: none !important;
 		animation: none !important;
 	}
+}
+
+/* ============================================================
+ * Application shell: top bar and side navigation.
+ *
+ * Reference-informed, not copied. Square edges, solid fills, a single accent
+ * rule, and mono for chrome labels. Chrome is dark so the reading surface
+ * stays light and high contrast, which matters more here than anywhere else
+ * because the content is long prose.
+ * ============================================================ */
+
+:root {
+	--chrome-bg: #16181d;
+	--chrome-bg-raised: #1e2127;
+	--chrome-fg: #e6e8ec;
+	--chrome-muted: #9aa1ad;
+	--chrome-border: #2b2f37;
+	--accent: #d97706;
+	--accent-soft: #2a2018;
+	--sidenav-width: 15rem;
+	--topbar-height: 3.25rem;
+}
+
+.topbar {
+	background: var(--chrome-bg);
+	/* One accent rule, the only saturated colour in the chrome. */
+	border-top: 3px solid var(--accent);
+	border-bottom: 1px solid var(--chrome-border);
+	position: sticky;
+	top: 0;
+	z-index: 20;
+}
+
+.topbar-inner {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	height: var(--topbar-height);
+	padding: 0 1rem;
+}
+
+.brand {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	color: var(--chrome-fg);
+	text-decoration: none;
+	font-family: var(--font-display);
+	text-transform: uppercase;
+	letter-spacing: -0.01em;
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.brand-mark {
+	background: var(--accent);
+	color: #12140f;
+	font-family: var(--font-mono);
+	font-size: 0.72rem;
+	letter-spacing: 0.06em;
+	padding: 0.25rem 0.4rem;
+}
+
+.topbar-links {
+	display: flex;
+	gap: 0.25rem;
+}
+
+.topbar-links a,
+.topbar-action,
+.topbar-identity,
+.topbar-login {
+	color: var(--chrome-muted);
+	text-decoration: none;
+	padding: 0.4rem 0.6rem;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	font-size: 0.9rem;
+}
+
+.topbar-links a:hover,
+.topbar-action:hover,
+.topbar-identity:hover,
+.topbar-login:hover {
+	background: var(--chrome-bg-raised);
+	color: var(--chrome-fg);
+}
+
+.topbar-search {
+	flex: 1 1 auto;
+	position: relative;
+	display: flex;
+	align-items: center;
+	min-width: 0;
+}
+
+.topbar-search-icon {
+	position: absolute;
+	left: 0.6rem;
+	color: var(--chrome-muted);
+	display: inline-flex;
+	pointer-events: none;
+}
+
+.topbar-search input {
+	width: 100%;
+	background: var(--chrome-bg-raised);
+	border: 1px solid var(--chrome-border);
+	color: var(--chrome-fg);
+	padding: 0.45rem 0.6rem 0.45rem 2.1rem;
+	font: inherit;
+	font-size: 0.9rem;
+}
+
+.topbar-search input::placeholder {
+	color: var(--chrome-muted);
+}
+
+.topbar-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.15rem;
+	margin-left: auto;
+}
+
+.topbar-action {
+	position: relative;
+}
+
+.topbar-login {
+	border: 1px solid var(--chrome-border);
+	color: var(--chrome-fg);
+}
+
+.topbar-logout .link-button {
+	color: var(--chrome-muted);
+	font-size: 0.9rem;
+}
+
+.topbar-logout .link-button:hover {
+	color: var(--chrome-fg);
+}
+
+/* Count badge. Never colour alone: the number is the signal. */
+.badge-count {
+	background: var(--accent);
+	color: #12140f;
+	font-family: var(--font-mono);
+	font-size: 0.65rem;
+	line-height: 1;
+	padding: 0.15rem 0.3rem;
+	margin-left: 0.15rem;
+}
+
+.shell {
+	display: flex;
+	align-items: flex-start;
+	min-height: calc(100vh - var(--topbar-height));
+}
+
+.sidenav {
+	width: var(--sidenav-width);
+	flex: 0 0 var(--sidenav-width);
+	background: var(--chrome-bg);
+	border-right: 1px solid var(--chrome-border);
+	padding: 1rem 0;
+	position: sticky;
+	top: var(--topbar-height);
+	align-self: stretch;
+}
+
+.sidenav-group {
+	list-style: none;
+	margin: 0 0 1rem;
+	padding: 0;
+}
+
+.sidenav-group a {
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+	padding: 0.45rem 1rem;
+	color: var(--chrome-muted);
+	text-decoration: none;
+	font-size: 0.9rem;
+	/* Reserve the marker width so the active state does not shift text. */
+	border-left: 3px solid transparent;
+}
+
+.sidenav-group a:hover {
+	background: var(--chrome-bg-raised);
+	color: var(--chrome-fg);
+}
+
+.sidenav-group a[aria-current='page'] {
+	background: var(--accent-soft);
+	color: var(--chrome-fg);
+	border-left-color: var(--accent);
+	font-weight: 600;
+}
+
+.sidenav-heading {
+	font-family: var(--font-mono);
+	font-size: 0.68rem;
+	text-transform: uppercase;
+	letter-spacing: 0.1em;
+	color: var(--chrome-muted);
+	margin: 0 0 0.4rem;
+	padding: 0 1rem;
+}
+
+.sidenav-note {
+	border-top: 1px solid var(--chrome-border);
+	margin: 1rem 0 0;
+	padding: 1rem;
+	color: var(--chrome-muted);
+	font-size: 0.8rem;
+}
+
+.sidenav-note p {
+	margin: 0 0 0.5rem;
+}
+
+.sidenav-note a {
+	color: var(--chrome-fg);
+}
+
+.shell-main {
+	flex: 1 1 auto;
+	min-width: 0;
+	background: var(--bg);
+}
+
+.shell-main-inner {
+	max-width: var(--max-width);
+	margin: 0 auto;
+	padding: 1.5rem 1.25rem 3rem;
+}
+
+.site-footer {
+	background: var(--chrome-bg);
+	border-top: 1px solid var(--chrome-border);
+	color: var(--chrome-muted);
+	font-size: 0.85rem;
+}
+
+.icon {
+	flex: 0 0 auto;
+}
+
+/* Focus must stay visible against the dark chrome, not only the light page. */
+.topbar a:focus-visible,
+.topbar button:focus-visible,
+.topbar input:focus-visible,
+.sidenav a:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: -2px;
+}
+
+/*
+ * Narrow viewports: the side panel becomes a horizontal scroller above the
+ * content rather than an off-canvas drawer, because a drawer needs JavaScript
+ * and browsing must work without it.
+ */
+@media (max-width: 52rem) {
+	.shell {
+		display: block;
+	}
+
+	.sidenav {
+		width: auto;
+		flex: none;
+		position: static;
+		border-right: 0;
+		border-bottom: 1px solid var(--chrome-border);
+		padding: 0.5rem 0;
+		display: flex;
+		gap: 0.5rem;
+		overflow-x: auto;
+	}
+
+	.sidenav-group {
+		display: flex;
+		margin: 0;
+	}
+
+	.sidenav-group a {
+		white-space: nowrap;
+		border-left: 0;
+		border-bottom: 3px solid transparent;
+	}
+
+	.sidenav-group a[aria-current='page'] {
+		border-left-color: transparent;
+		border-bottom-color: var(--accent);
+	}
+
+	.sidenav-heading,
+	.sidenav-note {
+		display: none;
+	}
+
+	.topbar-links {
+		display: none;
+	}
+}
+
+/* Profiles, avatars, and comments. */
+.avatar {
+	display: block;
+	background: var(--panel-bg);
+	border: 1px solid var(--border);
+	object-fit: cover;
+	/* Square, matching the rest of the interface. */
+	border-radius: 0;
+}
+
+.profile-head {
+	display: flex;
+	gap: 1rem;
+	align-items: flex-start;
+	margin: 0 0 1rem;
+}
+
+.profile-head h1 {
+	margin-top: 0;
+}
+
+.comments {
+	margin-top: 2rem;
+	border-top: 1px solid var(--rule);
+	padding-top: 1rem;
+}
+
+.comment-list {
+	list-style: none;
+	margin: 0 0 1.5rem;
+	padding: 0;
+}
+
+.comment {
+	display: flex;
+	gap: 0.75rem;
+	padding: 0.75rem 0;
+	border-bottom: 1px solid var(--rule);
+}
+
+.comment-body {
+	min-width: 0;
+	flex: 1 1 auto;
+}
+
+.comment-text {
+	/* Preserve the author's line breaks without rendering any markup. */
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	margin: 0.25rem 0;
+}
+
+.stack > * + * {
+	margin-top: 0.75rem;
 }

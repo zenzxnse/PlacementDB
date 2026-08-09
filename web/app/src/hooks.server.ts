@@ -1,4 +1,7 @@
+import { assertConfigured } from '$lib/server/config';
 import type { Handle } from '@sveltejs/kit';
+
+assertConfigured();
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const response = await resolve(event);

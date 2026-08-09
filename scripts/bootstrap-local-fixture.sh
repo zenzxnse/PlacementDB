@@ -28,7 +28,7 @@ readonly k_packages=(
 )
 
 fail() {
-  printf '%s\n' "bootstrap-local-demo: $*" >&2
+  printf '%s\n' "bootstrap-local-fixture: $*" >&2
   exit 1
 }
 
@@ -138,7 +138,7 @@ if [[ ! "${cmake_major}" =~ ^[0-9]+$ ]] \
   fail "CMake 4 or newer is required; found ${cmake_version}"
 fi
 
-printf '%s\n' "Local demo dependencies are ready."
+printf '%s\n' "Local fixture-server dependencies are ready."
 printf '%s\n' "Host: ${PRETTY_NAME:-${k_distribution_id}}"
 printf '%s\n' "CMake: ${cmake_version}"
 drogon_version="$(dpkg-query -W -f='${Version}' libdrogon-dev)"

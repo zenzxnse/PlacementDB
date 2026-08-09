@@ -2,49 +2,33 @@
 	import '../app.css';
 	import type { Snippet } from 'svelte';
 	import { page } from '$app/state';
+	import type { LayoutServerData } from './$types';
+	import TopBar from '$lib/components/TopBar.svelte';
+	import SideNav from '$lib/components/SideNav.svelte';
 
-	let { children }: { children: Snippet } = $props();
+	let { children, data }: { children: Snippet; data: LayoutServerData } = $props();
 
-	const navItems = [
-		{ href: '/', label: 'Home' },
-		{ href: '/questions', label: 'Questions' },
-		{ href: '/experiences', label: 'Experiences' },
-		{ href: '/search', label: 'Search' },
-		{ href: '/login', label: 'Log in' }
-	];
-
-	function isCurrent(href: string): boolean {
-		const path = page.url.pathname;
-		if (href === '/') return path === '/';
-		return path === href || path.startsWith(`${href}/`);
-	}
+	const me = $derived(data.me);
+	const pathname = $derived(page.url.pathname);
+	/* Keeps the current query visible in the bar after a search. */
+	const query = $derived(page.url.searchParams.get('q') ?? '');
 </script>
 
 <a class="skip-link" href="#main-content">Skip to main content</a>
 
-<header class="site-header">
-	<div class="container">
-		<a class="brand" href="/">PlacementDB</a>
-		<nav class="site-nav" aria-label="Primary">
-			<ul>
-				{#each navItems as item}
-					<li>
-						<a href={item.href} aria-current={isCurrent(item.href) ? 'page' : undefined}
-							>{item.label}</a
-						>
-					</li>
-				{/each}
-			</ul>
-		</nav>
-	</div>
-</header>
+<TopBar {me} {query} />
 
-<main id="main-content" class="container">
-	{@render children()}
-</main>
+<div class="shell">
+	<SideNav {me} {pathname} />
+	<main id="main-content" class="shell-main" tabindex="-1">
+		<div class="shell-main-inner">
+			{@render children()}
+		</div>
+	</main>
+</div>
 
 <footer class="site-footer">
-	<div class="container">
+	<div class="shell-main-inner">
 		<p>
 			PlacementDB is a community question bank for SRM placements. Every submission is
 			reviewed by moderators before it appears.

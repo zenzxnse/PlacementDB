@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { buildQuestionQuery, hasActiveFilters } from '$lib/query';
-	import { difficultySummary, roundLabel } from '$lib/format';
+	import { difficultySummary, roundLabel , companyName } from '$lib/format';
 	import type { Sort } from '$lib/types';
 
 	let { data }: { data: PageData } = $props();
@@ -46,7 +46,7 @@
 		<select id="filter-role" name="role">
 			<option value="">Any role</option>
 			{#each data.options.roles as role}
-				<option value={role} selected={selected(filters.role, role)}>{role}</option>
+				<option value={role.slug} selected={selected(filters.role, role.slug)}>{role.name}</option>
 			{/each}
 		</select>
 	</div>
@@ -128,7 +128,7 @@
 			{#each result.items as question (question.public_id)}
 				<tr>
 					<td><a href="/questions/{question.slug}">{question.title}</a></td>
-					<td>{question.company.name}</td>
+					<td>{companyName(question.company)}</td>
 					<td>{roundLabel(question.round)}</td>
 					<td>{question.source_year}</td>
 					<td>{difficultySummary(question.difficulty)}</td>

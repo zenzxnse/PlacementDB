@@ -30,6 +30,16 @@ INSERT INTO topics (name, slug, created_at) VALUES
     ('operating_systems', 'operating-systems', TIMESTAMPTZ '2026-07-01 00:00:00+00')
 ON CONFLICT (name) DO NOTHING;
 
+INSERT INTO job_roles (public_id, slug, name, created_at) VALUES
+    ('a1000000-0000-4000-8000-000000000001', 'software-engineer',
+     'Software Engineer', TIMESTAMPTZ '2026-07-01 00:00:00+00'),
+    ('a1000000-0000-4000-8000-000000000002', 'backend-developer',
+     'Backend Developer', TIMESTAMPTZ '2026-07-01 00:00:00+00'),
+    ('a1000000-0000-4000-8000-000000000003',
+     'software-development-engineer', 'Software Development Engineer',
+     TIMESTAMPTZ '2026-07-01 00:00:00+00')
+ON CONFLICT (public_id) DO NOTHING;
+
 INSERT INTO users (
     public_id, username, email, password_hash, display_name, role_id, status,
     password_changed_at, created_at, updated_at
@@ -75,49 +85,55 @@ SELECT 'b0000000-0000-4000-8000-000000000003', 'moderator_001',
 FROM roles r WHERE r.name = 'moderator'
 ON CONFLICT (public_id) DO NOTHING;
 
-INSERT INTO questions (public_id, slug, author_id, company_id, role_title,
+INSERT INTO questions (public_id, slug, title, author_id, company_id, role_title, job_role_id,
                        prompt, round, source_year, state, published_at,
                        created_at, updated_at)
 SELECT 'c0000000-0000-4000-8000-000000000001',
        'how-does-hash-map-handle-collisions',
-       u.id, c.id, 'Software Engineer',
+       'How a hash map handles collisions',
+       u.id, c.id, 'Software Engineer', jr.id,
        'Explain how a hash map handles collisions. Describe at least two strategies and their time complexity trade-offs.',
        'technical', 2024, 'published',
        TIMESTAMPTZ '2026-07-29 08:00:00+00',
        TIMESTAMPTZ '2026-07-28 08:00:00+00',
        TIMESTAMPTZ '2026-07-29 08:00:00+00'
-FROM users u, companies c
+FROM users u, companies c, job_roles jr
 WHERE u.username = 'student_001' AND c.slug = 'acme-corp'
+  AND jr.slug = 'software-engineer'
 ON CONFLICT (public_id) DO NOTHING;
 
-INSERT INTO questions (public_id, slug, author_id, company_id, role_title,
+INSERT INTO questions (public_id, slug, title, author_id, company_id, role_title, job_role_id,
                        prompt, round, source_year, state, published_at,
                        created_at, updated_at)
 SELECT 'c0000000-0000-4000-8000-000000000002',
        'design-a-url-shortener',
-       u.id, c.id, 'Backend Developer',
+       'Design a URL shortener',
+       u.id, c.id, 'Backend Developer', jr.id,
        'Design a URL shortening service that supports 100 million new URLs per month. Discuss storage, read-write ratio, and cache strategy.',
        'system_design', 2024, 'published',
        TIMESTAMPTZ '2026-07-25 10:30:00+00',
        TIMESTAMPTZ '2026-07-24 10:30:00+00',
        TIMESTAMPTZ '2026-07-25 10:30:00+00'
-FROM users u, companies c
+FROM users u, companies c, job_roles jr
 WHERE u.username = 'student_001' AND c.slug = 'globex'
+  AND jr.slug = 'backend-developer'
 ON CONFLICT (public_id) DO NOTHING;
 
-INSERT INTO questions (public_id, slug, author_id, company_id, role_title,
+INSERT INTO questions (public_id, slug, title, author_id, company_id, role_title, job_role_id,
                        prompt, round, source_year, state, published_at,
                        created_at, updated_at)
 SELECT 'c0000000-0000-4000-8000-000000000003',
        'binary-search-tree-operations',
-       u.id, c.id, 'Software Engineer',
+       'Binary search tree operations',
+       u.id, c.id, 'Software Engineer', jr.id,
        'Implement insert, search, and delete for a binary search tree. What are the worst-case time complexities and how can they be improved?',
        'coding', 2025, 'published',
        TIMESTAMPTZ '2026-07-30 14:15:00+00',
        TIMESTAMPTZ '2026-07-30 13:00:00+00',
        TIMESTAMPTZ '2026-07-30 14:15:00+00'
-FROM users u, companies c
+FROM users u, companies c, job_roles jr
 WHERE u.username = 'student_002' AND c.slug = 'initech'
+  AND jr.slug = 'software-engineer'
 ON CONFLICT (public_id) DO NOTHING;
 
 INSERT INTO question_topics (question_id, topic_id)
@@ -168,34 +184,38 @@ WHERE q.public_id = 'c0000000-0000-4000-8000-000000000003'
   AND u.username = 'student_001'
 ON CONFLICT DO NOTHING;
 
-INSERT INTO experiences (public_id, slug, author_id, company_id, role_title,
+INSERT INTO experiences (public_id, slug, title, author_id, company_id, role_title, job_role_id,
                          narrative, outcome, outcome_visible, anonymous,
-                         state, published_at, created_at, updated_at)
+                         source_year, state, published_at, created_at, updated_at)
 SELECT 'd0000000-0000-4000-8000-000000000001',
        'acme-corp-sde-interview-2024',
-       u.id, c.id, 'Software Development Engineer',
+       'Acme Corp SDE interview, 2024',
+       u.id, c.id, 'Software Development Engineer', jr.id,
        'I interviewed for an SDE role. The process had three rounds: an online coding test, a technical interview on data structures, and an HR round. The coding test focused on arrays and trees. The technical round was conversational and the interviewer gave hints.',
-       'offered', true, false,
+       'offered', true, false, 2024,
        'published', TIMESTAMPTZ '2026-07-28 11:00:00+00',
        TIMESTAMPTZ '2026-07-27 11:00:00+00',
        TIMESTAMPTZ '2026-07-28 11:00:00+00'
-FROM users u, companies c
+FROM users u, companies c, job_roles jr
 WHERE u.username = 'student_001' AND c.slug = 'acme-corp'
+  AND jr.slug = 'software-development-engineer'
 ON CONFLICT (public_id) DO NOTHING;
 
-INSERT INTO experiences (public_id, slug, author_id, company_id, role_title,
+INSERT INTO experiences (public_id, slug, title, author_id, company_id, role_title, job_role_id,
                          narrative, outcome, outcome_visible, anonymous,
-                         state, published_at, created_at, updated_at)
+                         source_year, state, published_at, created_at, updated_at)
 SELECT 'd0000000-0000-4000-8000-000000000002',
        'globex-backend-interview-2025',
-       u.id, c.id, 'Backend Developer',
+       'Globex backend interview, 2025',
+       u.id, c.id, 'Backend Developer', jr.id,
        'The synthetic process had a short screening call, one SQL exercise, and a system design discussion. The interviewer explained the constraints clearly and allowed time for questions.',
-       'rejected', false, true,
+       'rejected', false, true, 2025,
        'published', TIMESTAMPTZ '2026-07-26 16:00:00+00',
        TIMESTAMPTZ '2026-07-26 09:00:00+00',
        TIMESTAMPTZ '2026-07-26 16:00:00+00'
-FROM users u, companies c
+FROM users u, companies c, job_roles jr
 WHERE u.username = 'student_002' AND c.slug = 'globex'
+  AND jr.slug = 'backend-developer'
 ON CONFLICT (public_id) DO NOTHING;
 
 INSERT INTO experience_rounds (experience_id, ordinal, round, notes)

@@ -31,7 +31,7 @@ export const fixtureQuestions: Question[] = [
 		answer_guidance:
 			'Start with the two pointer approach from both ends of the array. Move the left pointer right when the sum is too small and the right pointer left when it is too large. For the unsorted variant, discuss the hash set trade-off and mention that sorting first costs an extra O(n log n).',
 		company: acme,
-		role: 'Backend Engineer',
+		role: { slug: 'backend-engineer', name: 'Backend Engineer' },
 		round: 'technical',
 		source_year: 2025,
 		topics: [arrays],
@@ -48,7 +48,7 @@ export const fixtureQuestions: Question[] = [
 		answer_guidance:
 			'Walk down from the root. If both values are smaller than the current node, move left. If both are larger, move right. Otherwise the current node is the split point and the answer. Duplicates need a defined placement rule before the argument holds.',
 		company: globex,
-		role: 'Software Development Engineer',
+		role: { slug: 'software-development-engineer', name: 'Software Development Engineer' },
 		round: 'technical',
 		source_year: 2025,
 		topics: [trees],
@@ -65,7 +65,7 @@ export const fixtureQuestions: Question[] = [
 		answer_guidance:
 			'Define the subproblem on prefixes of both strings. Each cell takes the minimum of three neighbours plus a substitution cost. Only the previous row is needed, so memory drops to the shorter string length.',
 		company: initech,
-		role: 'Software Development Engineer',
+		role: { slug: 'software-development-engineer', name: 'Software Development Engineer' },
 		round: 'online_assessment',
 		source_year: 2024,
 		topics: [dp],
@@ -82,7 +82,7 @@ export const fixtureQuestions: Question[] = [
 		answer_guidance:
 			'Estimate requests per second first. Compare a base62 counter against hashing the long URL, and talk through collisions. A cache in front of the redirect path covers the heavy read side. Deduplication is a product decision, so ask about it.',
 		company: acme,
-		role: 'Backend Engineer',
+		role: { slug: 'backend-engineer', name: 'Backend Engineer' },
 		round: 'system_design',
 		source_year: 2025,
 		topics: [systemDesign],
@@ -99,7 +99,7 @@ export const fixtureQuestions: Question[] = [
 		answer_guidance:
 			'A correlated subquery counting distinct higher salaries works without LIMIT. DENSE_RANK over the distinct salaries handles ties cleanly. An index on the salary column turns the sort into an ordered scan.',
 		company: northwind,
-		role: 'Data Engineer',
+		role: { slug: 'data-engineer', name: 'Data Engineer' },
 		round: 'online_assessment',
 		source_year: 2026,
 		topics: [sql],
@@ -116,7 +116,7 @@ export const fixtureQuestions: Question[] = [
 		answer_guidance:
 			'Track three colours during depth first search: unvisited, in the current path, and done. A back edge into the current path is a cycle. The Kahn ordering approach detects a cycle when the queue empties with unprocessed nodes left, which suits topological jobs like build ordering.',
 		company: bluepeak,
-		role: 'Software Development Engineer',
+		role: { slug: 'software-development-engineer', name: 'Software Development Engineer' },
 		round: 'technical',
 		source_year: 2025,
 		topics: [graphs],
@@ -133,7 +133,7 @@ export const fixtureQuestions: Question[] = [
 		answer_guidance:
 			'Separate the physical layout from the pricing policy and the ticket lifecycle. A strategy object for pricing keeps rate rules out of the core classes. Gate allocation is the natural concurrency point, so name it explicitly.',
 		company: initech,
-		role: 'Software Development Engineer',
+		role: { slug: 'software-development-engineer', name: 'Software Development Engineer' },
 		round: 'technical',
 		source_year: 2024,
 		topics: [ood, systemDesign],
@@ -150,7 +150,7 @@ export const fixtureQuestions: Question[] = [
 		answer_guidance:
 			'Cover address space isolation first. A context switch saves registers and flushes caches, and switching between processes also switches page tables. Isolation after a crash is the usual reason a database keeps one process per connection.',
 		company: globex,
-		role: 'Software Development Engineer',
+		role: { slug: 'software-development-engineer', name: 'Software Development Engineer' },
 		round: 'hr',
 		source_year: 2026,
 		topics: [os],
@@ -166,34 +166,18 @@ export const fixtureExperiences: Experience[] = [
 		slug: 'acme-backend-intern-2026',
 		title: 'Acme Corp backend intern interview, three rounds',
 		company: acme,
-		role: 'Backend Engineer Intern',
+		role: { slug: 'backend-engineer-intern', name: 'Backend Engineer Intern' },
 		source_year: 2026,
 		outcome: 'offered',
+		outcome_visible: true,
 		author: studentOne,
 		published_at: '2026-08-01T09:30:00Z',
-		summary:
-			'An online assessment with two coding tasks, a technical round on arrays and SQL, and a short HR round about past projects. Offer arrived four days later.',
-		narrative: [
-			'The process started with an online assessment on a proctored platform. Two questions: a sliding window problem and a SQL join across three tables. Both felt close to the practice sets shared on campus.',
-			'The technical round was video based. We spent most of the time on one array problem where the interviewer kept adding constraints: first duplicates, then a memory cap, then a follow-up about streaming input. They cared more about how I tested edge cases than about speed.',
-			'The HR round was short. Standard questions about why the company and where I see myself, plus one detailed question about my mini project. The offer came four days later with a clear joining window.'
-		],
+		narrative:
+			'The process started with an online assessment on a proctored platform. Two questions: a sliding window problem and a SQL join across three tables. Both felt close to the practice sets shared on campus.\n\nThe technical round was video based. We spent most of the time on one array problem where the interviewer kept adding constraints: first duplicates, then a memory cap, then a follow-up about streaming input. They cared more about how I tested edge cases than about speed.\n\nThe HR round was short. Standard questions about why the company and where I see myself, plus one detailed question about my mini project. The offer came four days later with a clear joining window.',
 		rounds: [
-			{
-				name: 'Online assessment',
-				round: 'online_assessment',
-				summary: 'Sliding window problem plus a three table SQL join, 90 minutes.'
-			},
-			{
-				name: 'Technical interview',
-				round: 'technical',
-				summary: 'One array problem with escalating constraints, heavy focus on edge cases.'
-			},
-			{
-				name: 'HR interview',
-				round: 'hr',
-				summary: 'Motivation questions and a walkthrough of a mini project.'
-			}
+			{ ordinal: 1, round: 'online_assessment', notes: 'Online assessment: Sliding window problem plus a three table SQL join, 90 minutes.' },
+			{ ordinal: 2, round: 'technical', notes: 'Technical interview: One array problem with escalating constraints, heavy focus on edge cases.' },
+			{ ordinal: 3, round: 'hr', notes: 'HR interview: Motivation questions and a walkthrough of a mini project.' }
 		]
 	},
 	{
@@ -201,34 +185,18 @@ export const fixtureExperiences: Experience[] = [
 		slug: 'globex-sde-campus-2025',
 		title: 'Globex Industries campus SDE process, rejected after design round',
 		company: globex,
-		role: 'Software Development Engineer',
+		role: { slug: 'software-development-engineer', name: 'Software Development Engineer' },
 		source_year: 2025,
 		outcome: 'rejected',
+		outcome_visible: true,
 		author: studentTwo,
 		published_at: '2026-07-15T12:00:00Z',
-		summary:
-			'Two coding rounds went well, but the system design round exposed weak capacity estimation practice. Sharing this so juniors drill estimates, not just algorithms.',
-		narrative: [
-			'The first two rounds were straightforward coding: a graph traversal and a string parsing question. I finished both with time left and felt confident.',
-			'The design round asked for a notification service. I jumped into the database schema before estimating traffic, and the interviewer redirected me twice. In hindsight the structure was standard: estimate, API, storage, delivery, failure cases. I had only practised the algorithm side.',
-			'Rejection came the next morning with a polite note. The takeaway is simple: practise saying numbers out loud, even rough ones, before touching a schema.'
-		],
+		narrative:
+			'The first two rounds were straightforward coding: a graph traversal and a string parsing question. I finished both with time left and felt confident.\n\nThe design round asked for a notification service. I jumped into the database schema before estimating traffic, and the interviewer redirected me twice. In hindsight the structure was standard: estimate, API, storage, delivery, failure cases. I had only practised the algorithm side.\n\nRejection came the next morning with a polite note. The takeaway is simple: practise saying numbers out loud, even rough ones, before touching a schema.',
 		rounds: [
-			{
-				name: 'Coding round one',
-				round: 'technical',
-				summary: 'Graph traversal with a memory constraint.'
-			},
-			{
-				name: 'Coding round two',
-				round: 'technical',
-				summary: 'String parsing with malformed input cases.'
-			},
-			{
-				name: 'System design round',
-				round: 'system_design',
-				summary: 'Notification service design, weak capacity estimates cost me the round.'
-			}
+			{ ordinal: 1, round: 'technical', notes: 'Coding round one: Graph traversal with a memory constraint.' },
+			{ ordinal: 2, round: 'technical', notes: 'Coding round two: String parsing with malformed input cases.' },
+			{ ordinal: 3, round: 'system_design', notes: 'System design round: Notification service design, weak capacity estimates cost me the round.' }
 		]
 	},
 	{
@@ -236,29 +204,17 @@ export const fixtureExperiences: Experience[] = [
 		slug: 'initech-data-engineer-2026',
 		title: 'Initech Solutions data engineer interview, withdrew mid-process',
 		company: initech,
-		role: 'Data Engineer',
+		role: { slug: 'data-engineer', name: 'Data Engineer' },
 		source_year: 2026,
 		outcome: 'withdrew',
+		outcome_visible: true,
 		author: null,
 		published_at: '2026-07-25T17:10:00Z',
-		summary:
-			'A solid SQL and pipeline round, but the role shifted towards on-site support work after the first round, so I stepped out before the final round.',
-		narrative: [
-			'The first round was a take-home SQL exercise: clean a messy event log and aggregate weekly retention. It was realistic and clearly scoped.',
-			'During the second round the interviewer described the day to day differently from the posting: mostly on-site support tickets with some pipeline work. That was not what I was looking for, so I withdrew before the final round.',
-			'I am sharing this because the interview quality itself was good. Ask early what the weekly work actually looks like.'
-		],
+		narrative:
+			'The first round was a take-home SQL exercise: clean a messy event log and aggregate weekly retention. It was realistic and clearly scoped.\n\nDuring the second round the interviewer described the day to day differently from the posting: mostly on-site support tickets with some pipeline work. That was not what I was looking for, so I withdrew before the final round.\n\nI am sharing this because the interview quality itself was good. Ask early what the weekly work actually looks like.',
 		rounds: [
-			{
-				name: 'Take-home SQL exercise',
-				round: 'online_assessment',
-				summary: 'Clean a messy event log and compute weekly retention.'
-			},
-			{
-				name: 'Technical interview',
-				round: 'technical',
-				summary: 'Pipeline walkthrough; role expectations surfaced here.'
-			}
+			{ ordinal: 1, round: 'online_assessment', notes: 'Take-home SQL exercise: Clean a messy event log and compute weekly retention.' },
+			{ ordinal: 2, round: 'technical', notes: 'Technical interview: Pipeline walkthrough; role expectations surfaced here.' }
 		]
 	},
 	{
@@ -266,39 +222,19 @@ export const fixtureExperiences: Experience[] = [
 		slug: 'northwind-robotics-sde-2026',
 		title: 'Northwind Robotics SDE interview, offer after a tight final round',
 		company: northwind,
-		role: 'Software Development Engineer',
+		role: { slug: 'software-development-engineer', name: 'Software Development Engineer' },
 		source_year: 2026,
 		outcome: 'offered',
+		outcome_visible: true,
 		author: studentThree,
 		published_at: '2026-08-04T10:00:00Z',
-		summary:
-			'Four rounds covering algorithms, operating systems, a practical debugging session, and values. The debugging round was the most unusual and the most fun.',
-		narrative: [
-			'Round one was a standard pair of algorithm questions with a shared editor. Round two was operating systems: scheduling, deadlocks, and one question about real time constraints that tied into their robotics work.',
-			'Round three was different from anything I had practised: a broken build and a failing test suite on a shared machine, and I had to find two seeded defects. It tested reading unfamiliar code calmly more than any algorithm did.',
-			'The final round was values and motivation, including how I handle disagreeing with a teammate. Offer in three days.'
-		],
+		narrative:
+			'Round one was a standard pair of algorithm questions with a shared editor. Round two was operating systems: scheduling, deadlocks, and one question about real time constraints that tied into their robotics work.\n\nRound three was different from anything I had practised: a broken build and a failing test suite on a shared machine, and I had to find two seeded defects. It tested reading unfamiliar code calmly more than any algorithm did.\n\nThe final round was values and motivation, including how I handle disagreeing with a teammate. Offer in three days.',
 		rounds: [
-			{
-				name: 'Algorithms round',
-				round: 'technical',
-				summary: 'Two problems in a shared editor, one dynamic programming.'
-			},
-			{
-				name: 'Operating systems round',
-				round: 'technical',
-				summary: 'Scheduling, deadlocks, and a real time constraint question.'
-			},
-			{
-				name: 'Debugging round',
-				round: 'technical',
-				summary: 'Find two seeded defects in a failing test suite.'
-			},
-			{
-				name: 'Values round',
-				round: 'hr',
-				summary: 'Teamwork and disagreement handling.'
-			}
+			{ ordinal: 1, round: 'technical', notes: 'Algorithms round: Two problems in a shared editor, one dynamic programming.' },
+			{ ordinal: 2, round: 'technical', notes: 'Operating systems round: Scheduling, deadlocks, and a real time constraint question.' },
+			{ ordinal: 3, round: 'technical', notes: 'Debugging round: Find two seeded defects in a failing test suite.' },
+			{ ordinal: 4, round: 'hr', notes: 'Values round: Teamwork and disagreement handling.' }
 		]
 	},
 	{
@@ -306,24 +242,16 @@ export const fixtureExperiences: Experience[] = [
 		slug: 'bluepeak-systems-intern-2025',
 		title: 'Bluepeak Systems intern interview, single long technical round',
 		company: bluepeak,
-		role: 'Software Development Engineer Intern',
+		role: { slug: 'software-development-engineer-intern', name: 'Software Development Engineer Intern' },
 		source_year: 2025,
 		outcome: 'unknown',
+		outcome_visible: true,
 		author: studentOne,
 		published_at: '2026-06-22T15:30:00Z',
-		summary:
-			'One 90 minute technical round covering a coding problem and theory questions. I never heard back, so the outcome stays unknown.',
-		narrative: [
-			'Bluepeak ran a single long round instead of separate stages. The first half was a coding problem about merging intervals with a twist: some intervals arrive out of order and you cannot store all of them.',
-			'The second half was rapid fire theory: hash table worst cases, TCP handshakes, and why virtual memory matters for a compiler.',
-			'No follow-up email ever arrived despite two polite pings. If you interview there, ask for a decision timeline up front.'
-		],
+		narrative:
+			'Bluepeak ran a single long round instead of separate stages. The first half was a coding problem about merging intervals with a twist: some intervals arrive out of order and you cannot store all of them.\n\nThe second half was rapid fire theory: hash table worst cases, TCP handshakes, and why virtual memory matters for a compiler.\n\nNo follow-up email ever arrived despite two polite pings. If you interview there, ask for a decision timeline up front.',
 		rounds: [
-			{
-				name: 'Combined technical round',
-				round: 'technical',
-				summary: 'Interval merging with streaming constraints, then rapid fire theory.'
-			}
+			{ ordinal: 1, round: 'technical', notes: 'Combined technical round: Interval merging with streaming constraints, then rapid fire theory.' }
 		]
 	}
 ];

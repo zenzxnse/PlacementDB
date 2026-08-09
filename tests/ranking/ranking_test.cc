@@ -1,14 +1,13 @@
 #include "ranking/ranking.h"
 
-#include <drogon/drogon_test.h>
-
+#include <cassert>
 #include <chrono>
 #include <string>
 #include <vector>
 
 namespace placedb::ranking {
 
-DROGON_TEST(HotScoreMonotonicallyNonIncreasing) {
+void HotScoreMonotonicallyNonIncreasing() {
     const double published_at = 1785585600.0;
     const std::vector<double> votes = {1785672000.0, 1785758400.0};
     double previous = RankingService::ComputeHotScore(
@@ -17,12 +16,12 @@ DROGON_TEST(HotScoreMonotonicallyNonIncreasing) {
         const double as_of = 1785758400.0 + (hour * 3600.0);
         const double current = RankingService::ComputeHotScore(
             published_at, votes, as_of);
-        CHECK(current <= previous);
+        assert(current <= previous);
         previous = current;
     }
 }
 
-DROGON_TEST(HotScoreOrderingAndReplay) {
+void HotScoreOrderingAndReplay() {
     const double as_of = 1786104000.0;
     const std::vector<double> no_votes;
     const std::vector<double> one_vote = {1786017600.0};
@@ -32,32 +31,32 @@ DROGON_TEST(HotScoreOrderingAndReplay) {
         1785754800.0, no_votes, as_of);
     const double with_vote = RankingService::ComputeHotScore(
         1785754800.0, one_vote, as_of);
-    CHECK(newer > older);
-    CHECK(with_vote > older);
-    CHECK(RankingService::ComputeHotScore(
+    assert(newer > older);
+    assert(with_vote > older);
+    assert(RankingService::ComputeHotScore(
         1785754800.0, one_vote, as_of) == with_vote);
 }
 
-DROGON_TEST(StrictUtcTimestampParsing) {
-    CHECK(RankingService::ParseUtcTimestamp(
+void StrictUtcTimestampParsing() {
+    assert(RankingService::ParseUtcTimestamp(
         "2026-08-05T12:00:00Z").has_value());
-    CHECK(!RankingService::ParseUtcTimestamp(
+    assert(!RankingService::ParseUtcTimestamp(
         "2026-08-05 12:00:00").has_value());
-    CHECK(!RankingService::ParseUtcTimestamp(
+    assert(!RankingService::ParseUtcTimestamp(
         "2026-08-05T24:00:00Z").has_value());
-    CHECK(!RankingService::ParseUtcTimestamp(
+    assert(!RankingService::ParseUtcTimestamp(
         "2026-08-05T12:60:00Z").has_value());
-    CHECK(!RankingService::ParseUtcTimestamp(
+    assert(!RankingService::ParseUtcTimestamp(
         "2026-08-05T12:00:60Z").has_value());
-    CHECK(!RankingService::ParseUtcTimestamp(
+    assert(!RankingService::ParseUtcTimestamp(
         "2026-08-05T12:00:00+00:00").has_value());
-    CHECK(!RankingService::ParseUtcTimestamp(
+    assert(!RankingService::ParseUtcTimestamp(
         "2026-02-29T12:00:00Z").has_value());
-    CHECK(RankingService::ParseUtcTimestamp(
+    assert(RankingService::ParseUtcTimestamp(
         "2028-02-29T23:59:59Z").has_value());
 }
 
-DROGON_TEST(RankingCursorRequiresMatchingAsOf) {
+void RankingCursorRequiresMatchingAsOf() {
     RankingParams params;
     params.as_of_ = "2026-08-05T12:00:00Z";
     params.cursor_ = RankingCursor{
@@ -68,10 +67,17 @@ DROGON_TEST(RankingCursorRequiresMatchingAsOf) {
     RankingService service(nullptr);
     const auto top = service.ListTop(params, "7 days");
     const auto hot = service.ListHot(params);
-    CHECK(top.IsErr());
-    CHECK(top.error() == db::DbError::kConstraintViolation);
-    CHECK(hot.IsErr());
-    CHECK(hot.error() == db::DbError::kConstraintViolation);
+    assert(top.IsErr());
+    assert(top.error() == db::DbError::kConstraintViolation);
+    assert(hot.IsErr());
+    assert(hot.error() == db::DbError::kConstraintViolation);
 }
 
 } /* namespace placedb::ranking */
+
+int main() {
+    placedb::ranking::HotScoreMonotonicallyNonIncreasing();
+    placedb::ranking::HotScoreOrderingAndReplay();
+    placedb::ranking::StrictUtcTimestampParsing();
+    placedb::ranking::RankingCursorRequiresMatchingAsOf();
+}

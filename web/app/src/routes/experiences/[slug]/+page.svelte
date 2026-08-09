@@ -1,8 +1,9 @@
 <script lang="ts">
-	import type { PageData } from './$types';
-	import { formatDate, outcomeLabel, roundLabel } from '$lib/format';
+	import Comments from '$lib/components/Comments.svelte';
+	import type { ActionData, PageData } from './$types';
+	import { formatDate, roundLabel, companyName, visibleOutcome, splitParagraphs } from '$lib/format';
 
-	let { data }: { data: PageData } = $props();
+	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	const experience = $derived(data.experience);
 </script>
@@ -23,15 +24,15 @@
 
 	<dl class="facts">
 		<dt>Company</dt>
-		<dd>{experience.company.name}</dd>
+		<dd>{companyName(experience.company)}</dd>
 		<dt>Role</dt>
-		<dd>{experience.role}</dd>
+		<dd>{experience.role?.name ?? 'Not recorded'}</dd>
 		<dt>Year</dt>
 		<dd>{experience.source_year}</dd>
-		<dt>Outcome</dt>
-		<dd>
-			{experience.outcome === null ? 'Hidden by the author' : outcomeLabel(experience.outcome)}
-		</dd>
+		{#if visibleOutcome(experience)}
+			<dt>Outcome</dt>
+			<dd>{visibleOutcome(experience)}</dd>
+		{/if}
 		<dt>Published</dt>
 		<dd>{formatDate(experience.published_at)}</dd>
 	</dl>
@@ -51,9 +52,9 @@
 				<tbody>
 					{#each experience.rounds as round}
 						<tr>
-							<td>{round.name}</td>
+							<td>{round.ordinal}</td>
 							<td>{roundLabel(round.round)}</td>
-							<td>{round.summary}</td>
+							<td>{round.notes ?? ''}</td>
 						</tr>
 					{/each}
 				</tbody>
@@ -61,7 +62,11 @@
 		</div>
 	{/if}
 
-	{#each experience.narrative as paragraph}
+	<!--
+		Split on blank lines for presentation only. The stored text is one
+		string and is never modified, so the author's exact wording survives.
+	-->
+	{#each splitParagraphs(experience.narrative) as paragraph}
 		<p>{paragraph}</p>
 	{/each}
 
@@ -74,3 +79,12 @@
 		{/if}
 	</p>
 </article>
+
+<Comments
+	comments={data.comments.items}
+	nextCursor={data.comments.next_cursor}
+	me={data.me}
+	action="?/comment"
+	csrfToken={data.csrfToken}
+	error={form?.commentError}
+/>

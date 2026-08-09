@@ -32,6 +32,7 @@ QuestionRecord RowToQuestion(const drogon::orm::Row& row) {
     rec.id_ = row["id"].as<std::int64_t>();
     rec.public_id_ = row["public_id"].as<std::string>();
     rec.slug_ = row["slug"].as<std::string>();
+    rec.title_ = row["title"].as<std::string>();
     rec.author_id_ = row["author_id"].as<std::int64_t>();
     rec.prompt_ = row["prompt"].as<std::string>();
     rec.state_ = row["state"].as<std::string>();
@@ -42,6 +43,9 @@ QuestionRecord RowToQuestion(const drogon::orm::Row& row) {
     }
     if (!row["role_title"].isNull()) {
         rec.role_title_ = row["role_title"].as<std::string>();
+    }
+    if (!row["job_role_id"].isNull()) {
+        rec.job_role_id_ = row["job_role_id"].as<std::int64_t>();
     }
     if (!row["answer_guidance"].isNull()) {
         rec.answer_guidance_ = row["answer_guidance"].as<std::string>();
@@ -63,6 +67,7 @@ ExperienceRecord RowToExperience(const drogon::orm::Row& row) {
     rec.id_ = row["id"].as<std::int64_t>();
     rec.public_id_ = row["public_id"].as<std::string>();
     rec.slug_ = row["slug"].as<std::string>();
+    rec.title_ = row["title"].as<std::string>();
     rec.author_id_ = row["author_id"].as<std::int64_t>();
     rec.narrative_ = row["narrative"].as<std::string>();
     rec.outcome_visible_ = row["outcome_visible"].as<bool>();
@@ -75,6 +80,12 @@ ExperienceRecord RowToExperience(const drogon::orm::Row& row) {
     }
     if (!row["role_title"].isNull()) {
         rec.role_title_ = row["role_title"].as<std::string>();
+    }
+    if (!row["job_role_id"].isNull()) {
+        rec.job_role_id_ = row["job_role_id"].as<std::int64_t>();
+    }
+    if (!row["source_year"].isNull()) {
+        rec.source_year_ = row["source_year"].as<std::int16_t>();
     }
     /* Hidden outcomes are never exposed to public readers. */
     if (rec.outcome_visible_ && !row["outcome"].isNull()) {
@@ -98,8 +109,8 @@ Result<QuestionRecord> QuestionRepository::FindByPublicId(
     const std::string& public_id) const {
     try {
         auto result = client_->execSqlSync(
-            "SELECT id, public_id::text, slug, author_id, company_id, "
-            "role_title, prompt, answer_guidance, round, source_year, "
+            "SELECT id, public_id::text, slug, title, author_id, company_id, "
+            "role_title, job_role_id, prompt, answer_guidance, round, source_year, "
             "state, published_at::text, created_at::text, updated_at::text "
             "FROM questions WHERE public_id = $1 AND state = 'published'",
             public_id);
@@ -116,8 +127,8 @@ Result<QuestionRecord> QuestionRepository::FindBySlug(
     const std::string& slug) const {
     try {
         auto result = client_->execSqlSync(
-            "SELECT id, public_id::text, slug, author_id, company_id, "
-            "role_title, prompt, answer_guidance, round, source_year, "
+            "SELECT id, public_id::text, slug, title, author_id, company_id, "
+            "role_title, job_role_id, prompt, answer_guidance, round, source_year, "
             "state, published_at::text, created_at::text, updated_at::text "
             "FROM questions WHERE slug = $1 AND state = 'published'",
             slug);
@@ -137,8 +148,8 @@ Result<std::vector<QuestionRecord>> QuestionRepository::ListPublished(
         const std::int32_t safe_page = std::clamp(page.page_, 1, 200);
         const std::int32_t offset = (safe_page - 1) * per_page;
         auto result = client_->execSqlSync(
-            "SELECT id, public_id::text, slug, author_id, company_id, "
-            "role_title, prompt, answer_guidance, round, source_year, "
+            "SELECT id, public_id::text, slug, title, author_id, company_id, "
+            "role_title, job_role_id, prompt, answer_guidance, round, source_year, "
             "state, published_at::text, created_at::text, updated_at::text "
             "FROM questions WHERE state = 'published' "
             "ORDER BY published_at DESC, id DESC "
@@ -162,8 +173,8 @@ Result<std::vector<QuestionRecord>> QuestionRepository::ListByCompany(
         const std::int32_t safe_page = std::clamp(page.page_, 1, 200);
         const std::int32_t offset = (safe_page - 1) * per_page;
         auto result = client_->execSqlSync(
-            "SELECT id, public_id::text, slug, author_id, company_id, "
-            "role_title, prompt, answer_guidance, round, source_year, "
+            "SELECT id, public_id::text, slug, title, author_id, company_id, "
+            "role_title, job_role_id, prompt, answer_guidance, round, source_year, "
             "state, published_at::text, created_at::text, updated_at::text "
             "FROM questions WHERE state = 'published' AND company_id = $1 "
             "ORDER BY published_at DESC, id DESC "
@@ -187,8 +198,8 @@ Result<std::vector<QuestionRecord>> QuestionRepository::ListByTopic(
         const std::int32_t safe_page = std::clamp(page.page_, 1, 200);
         const std::int32_t offset = (safe_page - 1) * per_page;
         auto result = client_->execSqlSync(
-            "SELECT q.id, q.public_id::text, q.slug, q.author_id, "
-            "q.company_id, q.role_title, q.prompt, q.answer_guidance, "
+            "SELECT q.id, q.public_id::text, q.slug, q.title, q.author_id, "
+            "q.company_id, q.role_title, q.job_role_id, q.prompt, q.answer_guidance, "
             "q.round, q.source_year, q.state, q.published_at::text, "
             "q.created_at::text, q.updated_at::text "
             "FROM questions q "
@@ -213,22 +224,24 @@ Result<QuestionRecord> QuestionRepository::Create(
     std::int64_t author_id,
     std::optional<std::int64_t> company_id,
     const std::string& slug,
+    const std::string& title,
     const std::string& prompt,
     std::optional<std::string> answer_guidance,
     std::optional<std::string> role_title,
+    std::optional<std::int64_t> job_role_id,
     std::optional<std::string> round,
     std::optional<std::int16_t> source_year) const {
     try {
         auto result = trans->execSqlSync(
             "INSERT INTO questions "
-            "(author_id, company_id, slug, prompt, answer_guidance, "
-            "role_title, round, source_year) "
-            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8) "
-            "RETURNING id, public_id::text, slug, author_id, company_id, "
-            "role_title, prompt, answer_guidance, round, source_year, "
+            "(author_id, company_id, slug, title, prompt, answer_guidance, "
+            "role_title, job_role_id, round, source_year) "
+            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) "
+            "RETURNING id, public_id::text, slug, title, author_id, company_id, "
+            "role_title, job_role_id, prompt, answer_guidance, round, source_year, "
             "state, published_at::text, created_at::text, updated_at::text",
-            author_id, company_id, slug, prompt,
-            answer_guidance, role_title, round, source_year);
+            author_id, company_id, slug, title, prompt,
+            answer_guidance, role_title, job_role_id, round, source_year);
         if (result.empty()) {
             return Result<QuestionRecord>::Err(DbError::kUnavailable);
         }
@@ -315,8 +328,8 @@ Result<ExperienceRecord> ExperienceRepository::FindByPublicId(
     const std::string& public_id) const {
     try {
         auto result = client_->execSqlSync(
-            "SELECT id, public_id::text, slug, author_id, company_id, "
-            "role_title, narrative, outcome, outcome_visible, anonymous, "
+            "SELECT id, public_id::text, slug, title, author_id, company_id, "
+            "role_title, job_role_id, source_year, narrative, outcome, outcome_visible, anonymous, "
             "state, published_at::text, created_at::text, updated_at::text "
             "FROM experiences WHERE public_id = $1 AND state = 'published'",
             public_id);
@@ -333,8 +346,8 @@ Result<ExperienceRecord> ExperienceRepository::FindBySlug(
     const std::string& slug) const {
     try {
         auto result = client_->execSqlSync(
-            "SELECT id, public_id::text, slug, author_id, company_id, "
-            "role_title, narrative, outcome, outcome_visible, anonymous, "
+            "SELECT id, public_id::text, slug, title, author_id, company_id, "
+            "role_title, job_role_id, source_year, narrative, outcome, outcome_visible, anonymous, "
             "state, published_at::text, created_at::text, updated_at::text "
             "FROM experiences WHERE slug = $1 AND state = 'published'",
             slug);
@@ -354,8 +367,8 @@ Result<std::vector<ExperienceRecord>> ExperienceRepository::ListPublished(
         const std::int32_t safe_page = std::clamp(page.page_, 1, 200);
         const std::int32_t offset = (safe_page - 1) * per_page;
         auto result = client_->execSqlSync(
-            "SELECT id, public_id::text, slug, author_id, company_id, "
-            "role_title, narrative, outcome, outcome_visible, anonymous, "
+            "SELECT id, public_id::text, slug, title, author_id, company_id, "
+            "role_title, job_role_id, source_year, narrative, outcome, outcome_visible, anonymous, "
             "state, published_at::text, created_at::text, updated_at::text "
             "FROM experiences WHERE state = 'published' "
             "ORDER BY published_at DESC, id DESC "
@@ -377,22 +390,25 @@ Result<ExperienceRecord> ExperienceRepository::Create(
     std::int64_t author_id,
     std::optional<std::int64_t> company_id,
     const std::string& slug,
+    const std::string& title,
     const std::string& narrative,
     std::optional<std::string> role_title,
+    std::optional<std::int64_t> job_role_id,
+    std::optional<std::int16_t> source_year,
     std::optional<std::string> outcome,
     bool outcome_visible,
     bool anonymous) const {
     try {
         auto result = trans->execSqlSync(
             "INSERT INTO experiences "
-            "(author_id, company_id, slug, narrative, role_title, outcome, "
-            "outcome_visible, anonymous) "
-            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8) "
-            "RETURNING id, public_id::text, slug, author_id, company_id, "
-            "role_title, narrative, outcome, outcome_visible, anonymous, "
+            "(author_id, company_id, slug, title, narrative, role_title, "
+            "job_role_id, source_year, outcome, outcome_visible, anonymous) "
+            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) "
+            "RETURNING id, public_id::text, slug, title, author_id, company_id, "
+            "role_title, job_role_id, source_year, narrative, outcome, outcome_visible, anonymous, "
             "state, published_at::text, created_at::text, updated_at::text",
-            author_id, company_id, slug, narrative,
-            role_title, outcome,
+            author_id, company_id, slug, title, narrative,
+            role_title, job_role_id, source_year, outcome,
             outcome_visible, anonymous);
         if (result.empty()) {
             return Result<ExperienceRecord>::Err(DbError::kUnavailable);
@@ -746,9 +762,11 @@ Result<SessionRecord> SessionRepository::FindByTokenHash(
             "SELECT encode(token_hash, 'hex') AS token_hash_hex, "
             "user_id, created_at::text, last_seen_at::text, "
             "expires_at::text, ip_prefix::text, "
-            "encode(user_agent_hash, 'hex') AS user_agent_hex "
+            "encode(user_agent_hash, 'hex') AS user_agent_hex, "
+            "encode(csrf_token_hash, 'hex') AS csrf_token_hex "
             "FROM sessions WHERE token_hash = decode($1, 'hex') "
-            "AND expires_at > now()",
+            "AND expires_at > now() "
+            "AND last_seen_at > now() - interval '14 days'",
             token_hash);
         if (result.empty()) {
             return Result<SessionRecord>::Err(DbError::kNotFound);
@@ -765,6 +783,10 @@ Result<SessionRecord> SessionRepository::FindByTokenHash(
         if (!result[0]["user_agent_hex"].isNull()) {
             rec.user_agent_hash_ =
                 result[0]["user_agent_hex"].as<std::string>();
+        }
+        if (!result[0]["csrf_token_hex"].isNull()) {
+            rec.csrf_token_hash_ =
+                result[0]["csrf_token_hex"].as<std::string>();
         }
         return Result<SessionRecord>::Ok(rec);
     } catch (const drogon::orm::DrogonDbException& e) {
@@ -805,6 +827,21 @@ Result<void> SessionRepository::Touch(
     }
 }
 
+Result<void> SessionRepository::SetCsrfTokenHash(
+    const std::string& token_hash,
+    const std::string& csrf_token_hash) const {
+    try {
+        const auto result = client_->execSqlSync(
+            "UPDATE sessions SET csrf_token_hash = decode($2, 'hex') "
+            "WHERE token_hash = decode($1, 'hex') RETURNING token_hash",
+            token_hash, csrf_token_hash);
+        if (result.empty()) return Result<void>::Err(DbError::kNotFound);
+        return Result<void>::Ok();
+    } catch (const drogon::orm::DrogonDbException& e) {
+        return Result<void>::Err(MapException(e));
+    }
+}
+
 Result<void> SessionRepository::DeleteByTokenHash(
     const std::string& token_hash) const {
     try {
@@ -836,6 +873,104 @@ Result<void> SessionRepository::DeleteExpired() const {
         return Result<void>::Ok();
     } catch (const drogon::orm::DrogonDbException& e) {
         return Result<void>::Err(MapException(e));
+    }
+}
+
+/* UserRepository */
+
+UserRepository::UserRepository(
+    const std::shared_ptr<drogon::orm::DbClient>& client) : client_(client) {}
+
+Result<UserRecord> UserRepository::FindById(std::int64_t id) const {
+    try {
+        auto rows = client_->execSqlSync(
+            "SELECT u.id, u.public_id::text, u.username, u.email, "
+            "u.display_name, r.name AS role_name, u.status, u.is_system, "
+            "u.created_at::text, u.updated_at::text FROM users u "
+            "JOIN roles r ON r.id = u.role_id WHERE u.id = $1", id);
+        if (rows.empty()) return Result<UserRecord>::Err(DbError::kNotFound);
+        UserRecord value;
+        value.id_ = rows[0]["id"].as<std::int64_t>();
+        value.public_id_ = rows[0]["public_id"].as<std::string>();
+        value.username_ = rows[0]["username"].as<std::string>();
+        value.email_ = rows[0]["email"].as<std::string>();
+        value.display_name_ = rows[0]["display_name"].as<std::string>();
+        value.role_name_ = rows[0]["role_name"].as<std::string>();
+        value.status_ = rows[0]["status"].as<std::string>();
+        value.is_system_ = rows[0]["is_system"].as<bool>();
+        value.created_at_ = rows[0]["created_at"].as<std::string>();
+        value.updated_at_ = rows[0]["updated_at"].as<std::string>();
+        return Result<UserRecord>::Ok(std::move(value));
+    } catch (const drogon::orm::DrogonDbException& e) {
+        return Result<UserRecord>::Err(MapException(e));
+    }
+}
+
+Result<UserRecord> UserRepository::FindLoginCandidate(
+    const std::string& username) const {
+    try {
+        auto rows = client_->execSqlSync(
+            "SELECT u.id, u.public_id::text, u.username, u.email, "
+            "u.display_name, r.name AS role_name, u.status, u.is_system, "
+            "u.password_hash, u.created_at::text, u.updated_at::text "
+            "FROM users u JOIN roles r ON r.id = u.role_id "
+            "WHERE (u.username = $1 OR u.email = $1) AND NOT u.is_system",
+            username);
+        if (rows.empty()) return Result<UserRecord>::Err(DbError::kNotFound);
+        UserRecord value;
+        value.id_ = rows[0]["id"].as<std::int64_t>();
+        value.public_id_ = rows[0]["public_id"].as<std::string>();
+        value.username_ = rows[0]["username"].as<std::string>();
+        value.email_ = rows[0]["email"].as<std::string>();
+        value.display_name_ = rows[0]["display_name"].as<std::string>();
+        value.role_name_ = rows[0]["role_name"].as<std::string>();
+        value.status_ = rows[0]["status"].as<std::string>();
+        value.is_system_ = rows[0]["is_system"].as<bool>();
+        value.password_hash_ = rows[0]["password_hash"].as<std::string>();
+        value.created_at_ = rows[0]["created_at"].as<std::string>();
+        value.updated_at_ = rows[0]["updated_at"].as<std::string>();
+        return Result<UserRecord>::Ok(std::move(value));
+    } catch (const drogon::orm::DrogonDbException& e) {
+        return Result<UserRecord>::Err(MapException(e));
+    }
+}
+
+/* JobRoleRepository */
+
+JobRoleRepository::JobRoleRepository(
+    const std::shared_ptr<drogon::orm::DbClient>& client) : client_(client) {}
+
+Result<std::vector<JobRoleRecord>> JobRoleRepository::List() const {
+    try {
+        auto rows = client_->execSqlSync(
+            "SELECT id, public_id::text, slug, name::text FROM job_roles "
+            "ORDER BY name, id");
+        std::vector<JobRoleRecord> values;
+        values.reserve(rows.size());
+        for (const auto& row : rows) {
+            values.push_back(JobRoleRecord{row["id"].as<std::int64_t>(),
+                row["public_id"].as<std::string>(),
+                row["slug"].as<std::string>(), row["name"].as<std::string>()});
+        }
+        return Result<std::vector<JobRoleRecord>>::Ok(std::move(values));
+    } catch (const drogon::orm::DrogonDbException& e) {
+        return Result<std::vector<JobRoleRecord>>::Err(MapException(e));
+    }
+}
+
+Result<JobRoleRecord> JobRoleRepository::FindBySlug(
+    const std::string& slug) const {
+    try {
+        auto rows = client_->execSqlSync(
+            "SELECT id, public_id::text, slug, name::text FROM job_roles "
+            "WHERE slug = $1", slug);
+        if (rows.empty()) return Result<JobRoleRecord>::Err(DbError::kNotFound);
+        return Result<JobRoleRecord>::Ok(JobRoleRecord{
+            rows[0]["id"].as<std::int64_t>(),
+            rows[0]["public_id"].as<std::string>(),
+            rows[0]["slug"].as<std::string>(), rows[0]["name"].as<std::string>()});
+    } catch (const drogon::orm::DrogonDbException& e) {
+        return Result<JobRoleRecord>::Err(MapException(e));
     }
 }
 

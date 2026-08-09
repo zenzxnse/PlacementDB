@@ -3,8 +3,10 @@ import {
 	fixtureExperiences,
 	fixtureQuestions
 } from './fixtures';
+import { ROUND_VALUES } from '$lib/types';
 import type {
 	Company,
+	NamedSlug,
 	Experience,
 	ExperienceFilters,
 	FilterOptions,
@@ -23,14 +25,14 @@ export const MAX_PAGE = 200;
 const AS_OF = Date.parse(FIXTURE_AS_OF);
 const DAY_MS = 86_400_000;
 
-function matchesCompany(value: string, company: Company): boolean {
+function matchesCompany(value: string, company: Company | null): boolean {
+	if (!company) return false;
 	return value === company.slug || value.toLowerCase() === company.name.toLowerCase();
 }
 
 function questionMatchesFilters(q: Question, f: QuestionFilters): boolean {
 	if (f.company.length > 0 && !f.company.some((c) => matchesCompany(c, q.company))) return false;
-	if (f.role.length > 0 && !f.role.some((r) => r.toLowerCase() === q.role.toLowerCase()))
-		return false;
+	if (f.role.length > 0 && !f.role.some((r) => r === q.role?.slug)) return false;
 	if (f.topic.length > 0 && !f.topic.some((t) => q.topics.some((qt) => qt.slug === t)))
 		return false;
 	if (f.year.length > 0 && !f.year.some((y) => y === String(q.source_year))) return false;
@@ -43,8 +45,7 @@ function questionMatchesFilters(q: Question, f: QuestionFilters): boolean {
 
 function experienceMatchesFilters(e: Experience, f: ExperienceFilters): boolean {
 	if (f.company.length > 0 && !f.company.some((c) => matchesCompany(c, e.company))) return false;
-	if (f.role.length > 0 && !f.role.some((r) => r.toLowerCase() === e.role.toLowerCase()))
-		return false;
+	if (f.role.length > 0 && !f.role.some((r) => r === e.role?.slug)) return false;
 	if (f.year.length > 0 && !f.year.some((y) => y === String(e.source_year))) return false;
 	if (f.outcome.length > 0 && !f.outcome.some((o) => o === e.outcome)) return false;
 	return true;
@@ -57,6 +58,8 @@ function paginate<T>(all: T[], page: number): Page<T> {
 	const start = (clamped - 1) * PER_PAGE;
 	return {
 		items: all.slice(start, start + PER_PAGE),
+		total_is_estimate: false,
+		next_cursor: null,
 		page: clamped,
 		per_page: PER_PAGE,
 		total,
@@ -152,7 +155,7 @@ export function search(params: {
 		.filter((q) => questionMatchesFilters(q, params.filters))
 		.filter((q) => {
 			if (terms.length === 0) return false;
-			const haystack = [q.title, q.prompt, q.company.name, q.role, ...q.topics.map((t) => t.name)]
+			const haystack = [q.title, q.prompt, q.company?.name ?? '', q.role?.name ?? '', ...q.topics.map((t) => t.name)]
 				.join(' ')
 				.toLowerCase();
 			return terms.every((t) => haystack.includes(t));
@@ -160,7 +163,7 @@ export function search(params: {
 
 	const experienceHits = fixtureExperiences.filter((e) => {
 		if (terms.length === 0) return false;
-		const haystack = [e.title, e.summary, ...e.narrative, e.company.name, e.role]
+		const haystack = [e.title, e.narrative, e.company?.name ?? '', e.role?.name ?? '']
 			.join(' ')
 			.toLowerCase();
 		return terms.every((t) => haystack.includes(t));
@@ -169,25 +172,27 @@ export function search(params: {
 	const hits = [
 		...questionHits.map((q) => ({
 			kind: 'question' as const,
+			public_id: q.public_id,
+			slug: q.slug,
 			title: q.title,
-			url: `/questions/${q.slug}`,
 			snippet: snippet(q.prompt, terms),
 			company: q.company,
-			year: q.source_year,
+			source_year: q.source_year,
 			difficulty: q.difficulty
 		})),
 		...experienceHits.map((e) => ({
 			kind: 'experience' as const,
+			public_id: e.public_id,
+			slug: e.slug,
 			title: e.title,
-			url: `/experiences/${e.slug}`,
-			snippet: snippet(e.summary, terms),
+			snippet: snippet(e.narrative, terms),
 			company: e.company,
-			year: e.source_year,
+			source_year: e.source_year,
 			difficulty: null
 		}))
 	];
 
-	hits.sort((a, b) => a.url.localeCompare(b.url));
+	hits.sort((a, b) => a.slug.localeCompare(b.slug));
 
 	return { status: 'ok', results: paginate(hits, params.page) };
 }
@@ -212,27 +217,28 @@ function snippet(text: string, terms: string[]): string {
 
 export function getFilterOptions(): FilterOptions {
 	const companies = new Map<string, Company>();
-	const roles = new Set<string>();
+	const roles = new Map<string, NamedSlug>();
 	const topics = new Map<string, Topic>();
 	const years = new Set<number>();
 	const outcomes = new Set<Outcome>();
 
 	for (const q of fixtureQuestions) {
-		companies.set(q.company.slug, q.company);
-		roles.add(q.role);
-		years.add(q.source_year);
+		if (q.company) companies.set(q.company.slug, q.company);
+		if (q.role) roles.set(q.role.slug, q.role);
+		if (q.source_year !== null) years.add(q.source_year);
 		for (const t of q.topics) topics.set(t.slug, t);
 	}
 	for (const e of fixtureExperiences) {
-		companies.set(e.company.slug, e.company);
-		roles.add(e.role);
-		years.add(e.source_year);
-		if (e.outcome !== null) outcomes.add(e.outcome);
+		if (e.company) companies.set(e.company.slug, e.company);
+		if (e.role) roles.set(e.role.slug, e.role);
+		if (e.source_year !== null) years.add(e.source_year);
+		if (e.outcome) outcomes.add(e.outcome);
 	}
 
 	return {
 		companies: [...companies.values()].sort((a, b) => a.name.localeCompare(b.name)),
-		roles: [...roles].sort(),
+		roles: [...roles.values()].sort((a, b) => a.name.localeCompare(b.name)),
+		rounds: [...ROUND_VALUES],
 		topics: [...topics.values()].sort((a, b) => a.name.localeCompare(b.name)),
 		years: [...years].sort((a, b) => b - a),
 		outcomes: [...outcomes]

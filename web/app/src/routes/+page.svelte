@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Unavailable from '$lib/components/Unavailable.svelte';
+	import { companyName } from '$lib/format';
 	let { data }: { data: import('./$types').PageData } = $props();
 </script>
 
@@ -26,13 +28,15 @@
 <div class="panel">
 	<div class="panel-head">Hot questions</div>
 	<div class="panel-body">
-		{#if data.hot.length > 0}
+		{#if data.hot.failure}
+			<Unavailable failure={data.hot.failure} retryHref="/" escape={{ href: "/questions", label: "Browse questions" }} />
+		{:else if data.hot.items.length > 0}
 			<ul class="list-plain">
-				{#each data.hot as question (question.public_id)}
+				{#each data.hot.items as question (question.public_id)}
 					<li>
 						<a href="/questions/{question.slug}">{question.title}</a>
 						<span class="meta">
-							{question.company.name} &middot; {question.source_year}
+							{companyName(question.company)} &middot; {question.source_year}
 						</span>
 					</li>
 				{/each}
@@ -47,13 +51,15 @@
 <div class="panel">
 	<div class="panel-head">New questions</div>
 	<div class="panel-body">
-		{#if data.fresh.length > 0}
+		{#if data.fresh.failure}
+			<Unavailable failure={data.fresh.failure} retryHref="/" escape={{ href: "/questions", label: "Browse questions" }} />
+		{:else if data.fresh.items.length > 0}
 			<ul class="list-plain">
-				{#each data.fresh as question (question.public_id)}
+				{#each data.fresh.items as question (question.public_id)}
 					<li>
 						<a href="/questions/{question.slug}">{question.title}</a>
 						<span class="meta">
-							{question.company.name} &middot; {question.source_year}
+							{companyName(question.company)} &middot; {question.source_year}
 						</span>
 					</li>
 				{/each}
@@ -68,13 +74,15 @@
 <div class="panel">
 	<div class="panel-head">Recent experiences</div>
 	<div class="panel-body">
-		{#if data.recent.length > 0}
+		{#if data.recent.failure}
+			<Unavailable failure={data.recent.failure} retryHref="/" escape={{ href: "/questions", label: "Browse questions" }} />
+		{:else if data.recent.items.length > 0}
 			<ul class="list-plain">
-				{#each data.recent as experience (experience.public_id)}
+				{#each data.recent.items as experience (experience.public_id)}
 					<li>
 						<a href="/experiences/{experience.slug}">{experience.title}</a>
 						<span class="meta">
-							{experience.company.name} &middot; {experience.source_year}
+							{companyName(experience.company)} &middot; {experience.source_year}
 						</span>
 					</li>
 				{/each}

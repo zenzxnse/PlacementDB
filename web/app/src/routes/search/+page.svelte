@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { buildSearchQuery, hasActiveFilters } from '$lib/query';
-	import { difficultySummary } from '$lib/format';
+	import { difficultySummary , companyName } from '$lib/format';
 
 	let { data }: { data: PageData } = $props();
 
@@ -101,12 +101,12 @@
 			</p>
 		{/if}
 		<ul class="list-plain">
-			{#each results.items as hit (hit.url)}
+			{#each results.items as hit (hit.public_id)}
 				<li>
-					<a href={hit.url}>{hit.title}</a>
+					<a href={`/${hit.kind === 'question' ? 'questions' : 'experiences'}/${hit.slug}`}>{hit.title}</a>
 					<p class="meta">
 						{hit.kind === 'question' ? 'Question' : 'Experience'} &middot;
-						{hit.company.name} &middot; {hit.year}
+						{companyName(hit.company)} &middot; {hit.source_year ?? 'Year not recorded'}
 						{#if hit.difficulty}
 							&middot; Difficulty {difficultySummary(hit.difficulty)}
 						{/if}

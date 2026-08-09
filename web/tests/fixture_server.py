@@ -47,7 +47,7 @@ class DemoHandler(SimpleHTTPRequestHandler):
 
 def main():
     server = HTTPServer(("127.0.0.1", 8080), DemoHandler)
-    print("PlacementDB fixture demo: http://127.0.0.1:8080", flush=True)
+    print("PlacementDB fixture server: http://127.0.0.1:8080", flush=True)
     server.serve_forever()
 
 

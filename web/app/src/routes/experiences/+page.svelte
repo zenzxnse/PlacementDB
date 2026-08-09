@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { buildExperienceQuery, hasActiveFilters } from '$lib/query';
-	import { outcomeLabel } from '$lib/format';
+	import { outcomeLabel, companyName, visibleOutcome } from '$lib/format';
 
 	let { data }: { data: PageData } = $props();
 
@@ -42,7 +42,7 @@
 		<select id="filter-role" name="role">
 			<option value="">Any role</option>
 			{#each data.options.roles as role}
-				<option value={role} selected={selected(filters.role, role)}>{role}</option>
+				<option value={role.slug} selected={selected(filters.role, role.slug)}>{role.name}</option>
 			{/each}
 		</select>
 	</div>
@@ -101,10 +101,10 @@
 			{#each result.items as experience (experience.public_id)}
 				<tr>
 					<td><a href="/experiences/{experience.slug}">{experience.title}</a></td>
-					<td>{experience.company.name}</td>
-					<td>{experience.role}</td>
+					<td>{companyName(experience.company)}</td>
+					<td>{experience.role?.name ?? 'Not recorded'}</td>
 					<td>{experience.source_year}</td>
-					<td>{experience.outcome === null ? 'Hidden' : outcomeLabel(experience.outcome)}</td>
+					<td>{visibleOutcome(experience) ?? ''}</td>
 				</tr>
 			{/each}
 		</tbody>

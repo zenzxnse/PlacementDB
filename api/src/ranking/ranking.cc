@@ -49,6 +49,7 @@ RankedQuestion RowToRankedQuestion(const drogon::orm::Row& row) {
     rq.question_.id_ = row["id"].as<std::int64_t>();
     rq.question_.public_id_ = row["public_id"].as<std::string>();
     rq.question_.slug_ = row["slug"].as<std::string>();
+    rq.question_.title_ = row["title"].as<std::string>();
     rq.question_.author_id_ = row["author_id"].as<std::int64_t>();
     rq.question_.prompt_ = row["prompt"].as<std::string>();
     rq.question_.state_ = row["state"].as<std::string>();
@@ -65,6 +66,9 @@ RankedQuestion RowToRankedQuestion(const drogon::orm::Row& row) {
     if (!row["role_title"].isNull()) {
         rq.question_.role_title_ =
             row["role_title"].as<std::string>();
+    }
+    if (!row["job_role_id"].isNull()) {
+        rq.question_.job_role_id_ = row["job_role_id"].as<std::int64_t>();
     }
     if (!row["answer_guidance"].isNull()) {
         rq.question_.answer_guidance_ =
@@ -98,8 +102,8 @@ db::Result<std::vector<RankedQuestion>> RankingService::ListNew(
                     db::DbError::kConstraintViolation);
             }
             auto result = client_->execSqlSync(
-                "SELECT q.id, q.public_id::text, q.slug, q.author_id, "
-                "q.company_id, q.role_title, q.prompt, q.answer_guidance, "
+                "SELECT q.id, q.public_id::text, q.slug, q.title, q.author_id, "
+                "q.company_id, q.role_title, q.job_role_id, q.prompt, q.answer_guidance, "
                 "q.round, q.source_year, q.state, q.published_at::text, "
                 "q.created_at::text, q.updated_at::text, "
                 "COALESCE(dv.mean, 0)::float8 AS diff_mean, "
@@ -125,8 +129,8 @@ db::Result<std::vector<RankedQuestion>> RankingService::ListNew(
                 std::move(ranked));
         }
         auto result = client_->execSqlSync(
-            "SELECT q.id, q.public_id::text, q.slug, q.author_id, "
-            "q.company_id, q.role_title, q.prompt, q.answer_guidance, "
+            "SELECT q.id, q.public_id::text, q.slug, q.title, q.author_id, "
+            "q.company_id, q.role_title, q.job_role_id, q.prompt, q.answer_guidance, "
             "q.round, q.source_year, q.state, q.published_at::text, "
             "q.created_at::text, q.updated_at::text, "
             "COALESCE(dv.mean, 0)::float8 AS diff_mean, "
@@ -172,8 +176,8 @@ db::Result<std::vector<RankedQuestion>> RankingService::ListTop(
                 return db::Result<std::vector<RankedQuestion>>::Err(
                     db::DbError::kConstraintViolation);
             }
-            sql = "SELECT q.id, q.public_id::text, q.slug, q.author_id, "
-                "q.company_id, q.role_title, q.prompt, q.answer_guidance, "
+            sql = "SELECT q.id, q.public_id::text, q.slug, q.title, q.author_id, "
+                "q.company_id, q.role_title, q.job_role_id, q.prompt, q.answer_guidance, "
                 "q.round, q.source_year, q.state, q.published_at::text, "
                 "q.created_at::text, q.updated_at::text, "
                 "COALESCE(vc.cnt, 0)::int AS top_score, "
@@ -213,8 +217,8 @@ db::Result<std::vector<RankedQuestion>> RankingService::ListTop(
             return db::Result<std::vector<RankedQuestion>>::Ok(
                 std::move(ranked));
         }
-        sql = "SELECT q.id, q.public_id::text, q.slug, q.author_id, "
-            "q.company_id, q.role_title, q.prompt, q.answer_guidance, "
+        sql = "SELECT q.id, q.public_id::text, q.slug, q.title, q.author_id, "
+            "q.company_id, q.role_title, q.job_role_id, q.prompt, q.answer_guidance, "
             "q.round, q.source_year, q.state, q.published_at::text, "
             "q.created_at::text, q.updated_at::text, "
             "COALESCE(vc.cnt, 0)::int AS top_score, "
@@ -288,8 +292,8 @@ db::Result<std::vector<RankedQuestion>> RankingService::ListHot(
                     db::DbError::kConstraintViolation);
             }
             const std::string sql =
-                "SELECT q.id, q.public_id::text, q.slug, q.author_id, "
-                "q.company_id, q.role_title, q.prompt, q.answer_guidance, "
+                "SELECT q.id, q.public_id::text, q.slug, q.title, q.author_id, "
+                "q.company_id, q.role_title, q.job_role_id, q.prompt, q.answer_guidance, "
                 "q.round, q.source_year, q.state, q.published_at::text, "
                 "q.created_at::text, q.updated_at::text, "
                 "COALESCE(dv.mean, 0)::float8 AS diff_mean, "
@@ -323,8 +327,8 @@ db::Result<std::vector<RankedQuestion>> RankingService::ListHot(
                 std::move(ranked));
         }
         const std::string sql =
-            "SELECT q.id, q.public_id::text, q.slug, q.author_id, "
-            "q.company_id, q.role_title, q.prompt, q.answer_guidance, "
+            "SELECT q.id, q.public_id::text, q.slug, q.title, q.author_id, "
+            "q.company_id, q.role_title, q.job_role_id, q.prompt, q.answer_guidance, "
             "q.round, q.source_year, q.state, q.published_at::text, "
             "q.created_at::text, q.updated_at::text, "
             "COALESCE(dv.mean, 0)::float8 AS diff_mean, "

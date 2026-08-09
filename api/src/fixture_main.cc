@@ -1,4 +1,4 @@
-#include "http/demo_server.h"
+#include "http/fixture_server.h"
 
 #include <charconv>
 #include <cstdint>
@@ -28,16 +28,16 @@ bool ParsePort(std::string_view input, std::uint16_t* port) {
 int main(int argc, char* argv[]) {
     if (argc != 3 && argc != 4) {
         std::cerr
-            << "Usage: placedb_demo_server <fixture-root> <static-root> [port]\n";
+            << "Usage: placedb_fixture_server <fixture-root> <static-root> [port]\n";
         return 2;
     }
 
-    placedb::http::DemoServerConfig config;
+    placedb::http::FixtureServerConfig config;
     config.fixture_root_ = argv[1];
     config.static_root_ = argv[2];
     if (argc == 4 && !ParsePort(argv[3], &config.port_)) {
         std::cerr << "Port must be an integer from 1 through 65535.\n";
         return 2;
     }
-    return placedb::http::RunDemoServer(config);
+    return placedb::http::RunFixtureServer(config);
 }

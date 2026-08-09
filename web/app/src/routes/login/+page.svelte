@@ -20,10 +20,9 @@
 
 <h1>Log in</h1>
 
-{#if data.apiConnected === false}
-	<p class="notice">
-		Login is not connected to the API yet. This page shows the flow that will exist once
-		the authentication milestone lands.
+{#if !data.csrfToken}
+	<p class="notice" role="status">
+		Sign-in is temporarily unavailable. Reload the page in a moment and try again.
 	</p>
 {/if}
 
@@ -45,6 +44,13 @@
 {/if}
 
 <form method="post" action="/login" class="panel panel-body" novalidate>
+	<!--
+		The CSRF token is rendered from server data. When issuance failed it is
+		empty, the submit button is disabled, and the action refuses the post,
+		so a submission cannot be attempted that the API is certain to reject.
+	-->
+	<input type="hidden" name="_csrf" value={data.csrfToken} />
+
 	<div class="field">
 		<label for="identity">Username or email</label>
 		<input
@@ -79,7 +85,24 @@
 	</div>
 
 	<div class="button-row">
-		<button type="submit" class="primary">Log in</button>
+		<!--
+			The submit guard is progressive enhancement only. Correctness lives
+			in the API's CSRF check and the single-use login token, so the form
+			is still safe with JavaScript disabled.
+		-->
+		<button
+			type="submit"
+			class="primary"
+			disabled={!data.csrfToken}
+			onclick={(event) => {
+				const button = event.currentTarget as HTMLButtonElement;
+				if (button.dataset.submitted === 'true') {
+					event.preventDefault();
+					return;
+				}
+				button.dataset.submitted = 'true';
+			}}>Log in</button
+		>
 	</div>
 </form>
 

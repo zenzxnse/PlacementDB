@@ -1,8 +1,9 @@
 <script lang="ts">
-	import type { PageData } from './$types';
-	import { difficultySummary, formatDate, roundLabel } from '$lib/format';
+	import Comments from '$lib/components/Comments.svelte';
+	import type { ActionData, PageData } from './$types';
+	import { difficultySummary, formatDate, roundLabel , companyName } from '$lib/format';
 
-	let { data }: { data: PageData } = $props();
+	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	const question = $derived(data.question);
 </script>
@@ -23,9 +24,9 @@
 
 	<dl class="facts">
 		<dt>Company</dt>
-		<dd>{question.company.name}</dd>
+		<dd>{companyName(question.company)}</dd>
 		<dt>Role</dt>
-		<dd>{question.role}</dd>
+		<dd>{question.role?.name ?? 'Not recorded'}</dd>
 		<dt>Round</dt>
 		<dd>{roundLabel(question.round)}</dd>
 		<dt>Source year</dt>
@@ -75,3 +76,12 @@
 		{/if}
 	</p>
 </article>
+
+<Comments
+	comments={data.comments.items}
+	nextCursor={data.comments.next_cursor}
+	me={data.me}
+	action="?/comment"
+	csrfToken={data.csrfToken}
+	error={form?.commentError}
+/>

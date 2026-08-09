@@ -1,8 +1,5 @@
-# Private planning and architecture coordination
 plan.md
 adr/
-
-# Private agent instructions and local coordination state
 AGENTS.md
 **/AGENTS.md
 agent.md
@@ -10,20 +7,16 @@ agents.md
 codex.md
 .agents/
 .codex/
-
-# Local CMake state
 CMakeUserPresets.json
 out/
 build/
 build-*/
 cmake-build-*/
-
-# Local frontend state
 web/app/node_modules/
 web/app/.svelte-kit/
 web/app/build/
-
-# Secrets and local runtime configuration
+uploads/
+**/uploads/
 .env
 .env.*
 !.env.example
@@ -34,15 +27,10 @@ web/app/build/
 *.pfx
 *.pgpass
 pgpass.conf
-
-# Local source data and generated ETL output
 pbdata/
 out/etl/
-
-# Documentation, excluded by lead instruction 2026-08-09
+out/import/
 docs/
-
-# Local logs and editor state
 *.log
 __pycache__/
 *.pyc

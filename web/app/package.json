@@ -12,7 +12,8 @@
     "preview": "vite preview --host 127.0.0.1",
     "start": "HOST=127.0.0.1 node build/index.js",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@sveltejs/adapter-node": "^5.5.7",
@@ -21,6 +22,7 @@
     "svelte": "^5.56.8",
     "svelte-check": "^4.7.5",
     "typescript": "^5.9.3",
-    "vite": "^8.2.1"
+    "vite": "^8.2.1",
+    "vitest": "^4.1.10"
   }
 }

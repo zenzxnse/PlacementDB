@@ -1,4 +1,4 @@
-#include "http/demo_server.h"
+#include "http/fixture_server.h"
 
 #include <drogon/drogon.h>
 
@@ -143,7 +143,7 @@ std::optional<std::string> LoadBoundedFile(
 
 using AssetMap = std::unordered_map<std::string, LoadedAsset>;
 
-std::optional<AssetMap> LoadAssets(const DemoServerConfig& config) {
+std::optional<AssetMap> LoadAssets(const FixtureServerConfig& config) {
     AssetMap assets;
     assets.reserve(kAssetSpecs.size());
     for (const auto& spec : kAssetSpecs) {
@@ -152,7 +152,7 @@ std::optional<AssetMap> LoadAssets(const DemoServerConfig& config) {
             : config.static_root_;
         auto body = LoadBoundedFile(root, spec.relative_path_);
         if (!body.has_value()) {
-            std::cerr << "Unable to load required demo asset: "
+            std::cerr << "Unable to load required fixture asset: "
                       << spec.relative_path_ << '\n';
             return std::nullopt;
         }
@@ -210,7 +210,7 @@ drogon::HttpResponsePtr MakeHealthResponse(
 
 } /* anonymous namespace */
 
-int RunDemoServer(const DemoServerConfig& config) {
+int RunFixtureServer(const FixtureServerConfig& config) {
     auto loaded_assets = LoadAssets(config);
     if (!loaded_assets.has_value()) {
         return 2;
@@ -243,7 +243,7 @@ int RunDemoServer(const DemoServerConfig& config) {
         },
         {drogon::Get, drogon::Head});
 
-    std::cout << "PlacementDB database-free demo listening on http://127.0.0.1:"
+    std::cout << "PlacementDB database-free fixture server listening on http://127.0.0.1:"
               << config.port_ << '\n';
     app.run();
     return 0;
