@@ -25,6 +25,7 @@ uploads/
 .env.*
 !.env.example
 !.env.*.example
+.venv/
 *.key
 *.pem
 *.p12
