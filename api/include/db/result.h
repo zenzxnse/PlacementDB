@@ -4,6 +4,7 @@
 #include "db/db_error.h"
 
 #include <optional>
+#include <type_traits>
 #include <utility>
 #include <variant>
 
@@ -14,6 +15,10 @@ class Result {
   public:
     static Result Ok(T value) {
         return Result(std::move(value));
+    }
+
+    static Result OkDefault() requires std::is_default_constructible_v<T> {
+        return Result(std::in_place_type<T>);
     }
 
     static Result Err(DbError error) {
@@ -37,6 +42,7 @@ class Result {
 
   private:
     explicit Result(T value) : data_(std::move(value)) {}
+    explicit Result(std::in_place_type_t<T>) : data_(std::in_place_type<T>) {}
     explicit Result(DbError error) : data_(error) {}
 
     std::variant<T, DbError> data_;

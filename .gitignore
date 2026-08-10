@@ -5,6 +5,10 @@ AGENTS.md
 agent.md
 agents.md
 codex.md
+CLAUDE.md
+**/CLAUDE.md
+claude.md
+.claude/
 .agents/
 .codex/
 CMakeUserPresets.json

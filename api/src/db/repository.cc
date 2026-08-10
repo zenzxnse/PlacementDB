@@ -550,8 +550,7 @@ DifficultyVoteRepository::FindActive(
             "WHERE question_id = $1 AND user_id = $2 AND cleared_at IS NULL",
             question_id, user_id);
         if (result.empty()) {
-            return Result<std::optional<DifficultyVoteRecord>>::Ok(
-                std::nullopt);
+            return Result<std::optional<DifficultyVoteRecord>>::OkDefault();
         }
         DifficultyVoteRecord rec;
         rec.id_ = result[0]["id"].as<std::int64_t>();

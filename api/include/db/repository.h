@@ -116,6 +116,36 @@ class UserRepository {
     explicit UserRepository(const std::shared_ptr<drogon::orm::DbClient>& client);
     Result<UserRecord> FindById(std::int64_t id) const;
     Result<UserRecord> FindLoginCandidate(const std::string& username) const;
+
+    /**
+     * Resolves a system account by username, and only a system account.
+     *
+     * The import flow needs the placement_records author id. Filtering on
+     * is_system here means a caller asking for the import author can never
+     * resolve a human account by accident.
+     */
+    Result<UserRecord> FindSystemUserByUsername(
+        const std::string& username) const;
+
+  private:
+    std::shared_ptr<drogon::orm::DbClient> client_;
+};
+
+class CompanyRepository {
+  public:
+    explicit CompanyRepository(
+        const std::shared_ptr<drogon::orm::DbClient>& client);
+
+    Result<std::vector<CompanyRecord>> List() const;
+    Result<CompanyRecord> FindBySlug(const std::string& slug) const;
+
+    /**
+     * Exact canonical name match, or a case-insensitive alias match.
+     * Company names are plain text, not citext, so the canonical comparison
+     * is exact by design; aliases carry the citext comparison.
+     */
+    Result<CompanyRecord> FindByNameOrAlias(const std::string& name) const;
+
   private:
     std::shared_ptr<drogon::orm::DbClient> client_;
 };
@@ -125,6 +155,10 @@ class JobRoleRepository {
     explicit JobRoleRepository(const std::shared_ptr<drogon::orm::DbClient>& client);
     Result<std::vector<JobRoleRecord>> List() const;
     Result<JobRoleRecord> FindBySlug(const std::string& slug) const;
+
+    /** Case-insensitive exact name match on the citext name column. */
+    Result<JobRoleRecord> FindByName(const std::string& name) const;
+
   private:
     std::shared_ptr<drogon::orm::DbClient> client_;
 };

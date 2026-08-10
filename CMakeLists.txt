@@ -99,6 +99,7 @@ if(PLACEDB_BUILD_PRODUCTION_SERVER)
     api/src/http/social_routes.cc
     api/src/ranking/ranking.cc
     api/src/search/search_worker.cc
+    api/src/search/meilisearch_index.cc
     api/src/storage/avatar_store.cc
     api/src/validation/validator.cc
   )

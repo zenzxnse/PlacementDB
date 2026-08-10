@@ -62,7 +62,11 @@ struct ImportSourceRecord {
     std::optional<std::string> title_;
     std::optional<std::string> source_type_;
     std::optional<std::string> publisher_;
+    std::optional<std::string> published_or_event_date_;
+    std::optional<std::string> reliability_;
+    std::optional<std::string> coverage_;
     std::optional<std::string> url_;
+    std::optional<std::string> scope_notes_;
 };
 
 struct ContentProvenanceRecord {

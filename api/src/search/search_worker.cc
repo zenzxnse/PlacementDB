@@ -1,15 +1,18 @@
 #include "search/search_worker.h"
 
 #include <drogon/orm/Exception.h>
+#include <algorithm>
 #include <iomanip>
 #include <sstream>
+#include <utility>
+#include <vector>
 
 namespace placedb::search {
 namespace {
 db::DbError MapException(const drogon::orm::DrogonDbException&) {
     return db::DbError::kUnavailable;
 }
-}
+} /* namespace */
 
 VisibilityRepository::VisibilityRepository(
     const std::shared_ptr<drogon::orm::DbClient>& client) : client_(client) {}
@@ -53,8 +56,8 @@ db::Result<std::optional<SearchDocument>> VisibilityRepository::LoadPublished(
     }
 }
 
-SearchWorker::SearchWorker(const VisibilityRepository& visibility,
-    SearchIndex& index, db::OutboxRepository& outbox, std::string lease_owner)
+SearchWorker::SearchWorker(const VisibilitySource& visibility,
+    SearchIndex& index, const db::OutboxFinalizer& outbox, std::string lease_owner)
     : visibility_(visibility), index_(index), outbox_(outbox),
       lease_owner_(std::move(lease_owner)) {}
 
@@ -81,8 +84,10 @@ db::Result<void> SearchWorker::ProcessClaimed(const db::OutboxEntry& entry) cons
 }
 
 std::string SearchWorker::PayloadHash(const SearchDocument& document) {
-    // Stable non-cryptographic fingerprint; the database column is diagnostic,
-    // not an authentication primitive.
+    /*
+     * Stable non-cryptographic fingerprint; the database column is diagnostic,
+     * not an authentication primitive.
+     */
     const std::string value = document.target_type_ + "\n" +
         std::to_string(document.target_id_) + "\n" + document.public_id_ +
         "\n" + document.slug_ + "\n" + document.title_ + "\n" + document.body_;
@@ -98,4 +103,63 @@ std::string SearchWorker::PayloadHash(const SearchDocument& document) {
     return part + part + part + part;
 }
 
-} // namespace placedb::search
+SearchWorkerLoop::SearchWorkerLoop(
+    std::shared_ptr<drogon::orm::DbClient> client, SearchWorker worker,
+    std::int32_t batch_size, std::string lease_duration_interval)
+    : client_(std::move(client)), worker_(std::move(worker)),
+      batch_size_(std::clamp(batch_size, 1, 100)),
+      lease_duration_interval_(std::move(lease_duration_interval)) {}
+
+db::Result<WorkerBatchResult> SearchWorkerLoop::RunOnce() const {
+    if (!client_) {
+        return db::Result<WorkerBatchResult>::Err(db::DbError::kConstraintViolation);
+    }
+    db::OutboxRepository outbox(client_);
+
+    /*
+     * Stale claims from a crashed worker are returned to pending before
+     * claiming, so this cycle can pick them up again. Best effort: a failure
+     * here only delays recovery, and the claim predicate below also reclaims
+     * rows whose lease has expired.
+     */
+    const auto recovered = outbox.RecoverStaleLeases();
+    if (recovered.IsErr()) {
+        return db::Result<WorkerBatchResult>::Err(recovered.error());
+    }
+
+    std::vector<db::OutboxEntry> entries;
+    try {
+        /*
+         * The claim batch commits as one transaction when the handle leaves
+         * scope. Entries become visible as claimed before any index work
+         * starts, and a crash mid-cycle leaves them with an expiring lease
+         * instead of a silent loss.
+         */
+        auto transaction = client_->newTransaction();
+        auto claimed = outbox.ClaimBatch(
+            transaction, worker_.LeaseOwner(), batch_size_,
+            lease_duration_interval_);
+        if (claimed.IsErr()) {
+            return db::Result<WorkerBatchResult>::Err(claimed.error());
+        }
+        entries = std::move(claimed.value());
+    } catch (const drogon::orm::TimeoutError&) {
+        return db::Result<WorkerBatchResult>::Err(db::DbError::kTimeout);
+    } catch (const drogon::orm::DrogonDbException&) {
+        return db::Result<WorkerBatchResult>::Err(db::DbError::kUnavailable);
+    }
+
+    WorkerBatchResult result;
+    result.claimed_ = static_cast<std::int32_t>(entries.size());
+    for (const auto& entry : entries) {
+        const auto processed = worker_.ProcessClaimed(entry);
+        if (processed.IsOk()) {
+            ++result.completed_;
+        } else {
+            ++result.failed_;
+        }
+    }
+    return db::Result<WorkerBatchResult>::Ok(result);
+}
+
+} /* namespace placedb::search */

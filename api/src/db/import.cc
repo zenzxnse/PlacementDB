@@ -18,7 +18,62 @@ ImportBatchRecord Batch(const drogon::orm::Row& row) {
         row["export_schema_version"].as<std::string>(),
         row["imported_by"].as<std::int64_t>(), row["created_at"].as<std::string>()};
 }
-} // namespace
+ImportSourceRecord Source(const drogon::orm::Row& row) {
+    ImportSourceRecord record;
+    record.id_ = row["id"].as<std::int64_t>();
+    record.import_batch_id_ = row["import_batch_id"].as<std::int64_t>();
+    record.source_id_ = row["source_id"].as<std::string>();
+    if (!row["title"].isNull()) {
+        record.title_ = row["title"].as<std::string>();
+    }
+    if (!row["source_type"].isNull()) {
+        record.source_type_ = row["source_type"].as<std::string>();
+    }
+    if (!row["publisher"].isNull()) {
+        record.publisher_ = row["publisher"].as<std::string>();
+    }
+    if (!row["published_or_event_date"].isNull()) {
+        record.published_or_event_date_ =
+            row["published_or_event_date"].as<std::string>();
+    }
+    if (!row["reliability"].isNull()) {
+        record.reliability_ = row["reliability"].as<std::string>();
+    }
+    if (!row["coverage"].isNull()) {
+        record.coverage_ = row["coverage"].as<std::string>();
+    }
+    if (!row["url"].isNull()) {
+        record.url_ = row["url"].as<std::string>();
+    }
+    if (!row["scope_notes"].isNull()) {
+        record.scope_notes_ = row["scope_notes"].as<std::string>();
+    }
+    return record;
+}
+ContentProvenanceRecord Provenance(const drogon::orm::Row& row) {
+    ContentProvenanceRecord record;
+    record.id_ = row["id"].as<std::int64_t>();
+    record.import_batch_id_ = row["import_batch_id"].as<std::int64_t>();
+    record.target_type_ = row["target_type"].as<std::string>();
+    record.target_id_ = row["target_id"].as<std::int64_t>();
+    record.source_table_ = row["source_table"].as<std::string>();
+    record.source_row_id_ = row["source_row_id"].as<std::string>();
+    record.workbook_row_ = row["workbook_row"].as<std::int32_t>();
+    record.affiliation_ = row["affiliation"].as<std::string>();
+    record.confidence_ = row["confidence"].as<std::string>();
+    if (!row["campus_scope"].isNull()) {
+        record.campus_scope_ = row["campus_scope"].as<std::string>();
+    }
+    if (!row["wording_fidelity"].isNull()) {
+        record.wording_fidelity_ = row["wording_fidelity"].as<std::string>();
+    }
+    if (!row["notes"].isNull()) {
+        record.notes_ = row["notes"].as<std::string>();
+    }
+    record.original_row_sha256_ = row["original_row_sha256"].as<std::string>();
+    return record;
+}
+} /* namespace */
 
 Result<ImportBatchRecord> ImportRepository::CreateBatch(
     const drogon::orm::DbClientPtr& transaction, const NewImportBatch& batch) const {
@@ -41,6 +96,33 @@ Result<ImportBatchRecord> ImportRepository::CreateBatch(
     }
 }
 
+Result<ImportBatchRecord> ImportRepository::ResolveBatch(
+    const drogon::orm::DbClientPtr& transaction, const NewImportBatch& batch) const {
+    if (!transaction || batch.workbook_filename_.empty()
+        || batch.workbook_sha256_.empty() || batch.archive_sha256_.empty()
+        || batch.export_schema_version_.empty()) {
+        return Result<ImportBatchRecord>::Err(DbError::kConstraintViolation);
+    }
+    const auto existing = FindByWorkbookDigest(transaction, batch.workbook_sha256_);
+    if (existing.IsOk()) {
+        /*
+         * One workbook digest, one archive, fail closed. A re-run of the same
+         * artifact is idempotent; a different artifact under an accepted
+         * workbook digest is refused without writing anything.
+         */
+        const auto& accepted = existing.value();
+        if (accepted.archive_sha256_ != batch.archive_sha256_
+            || accepted.export_schema_version_ != batch.export_schema_version_) {
+            return Result<ImportBatchRecord>::Err(DbError::kConflict);
+        }
+        return existing;
+    }
+    if (existing.error() != DbError::kNotFound) {
+        return Result<ImportBatchRecord>::Err(existing.error());
+    }
+    return CreateBatch(transaction, batch);
+}
+
 Result<ImportBatchRecord> ImportRepository::FindByWorkbookDigest(
     const drogon::orm::DbClientPtr& transaction, const std::string& digest) const {
     if (!transaction) return Result<ImportBatchRecord>::Err(DbError::kConstraintViolation);
@@ -53,6 +135,42 @@ Result<ImportBatchRecord> ImportRepository::FindByWorkbookDigest(
         return Result<ImportBatchRecord>::Ok(Batch(rows[0]));
     } catch (const drogon::orm::DrogonDbException& e) {
         return Result<ImportBatchRecord>::Err(Map(e));
+    }
+}
+
+Result<ImportSourceRecord> ImportRepository::EnsureSource(
+    const drogon::orm::DbClientPtr& transaction, std::int64_t batch_id,
+    const NewImportSource& source) const {
+    if (!transaction || batch_id <= 0 || source.source_id_.empty()) {
+        return Result<ImportSourceRecord>::Err(DbError::kConstraintViolation);
+    }
+    try {
+        /*
+         * ON CONFLICT DO NOTHING is still a plain INSERT, which is the only
+         * write the application role is granted on import_sources. The first
+         * accepted row wins; a re-run returns it unchanged.
+         */
+        transaction->execSqlSync(
+            "INSERT INTO import_sources (import_batch_id, source_id, title, "
+            "source_type, publisher, published_or_event_date, reliability, "
+            "coverage, url, scope_notes) "
+            "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) "
+            "ON CONFLICT (import_batch_id, source_id) DO NOTHING",
+            batch_id, source.source_id_, source.title_, source.source_type_,
+            source.publisher_, source.published_or_event_date_,
+            source.reliability_, source.coverage_, source.url_,
+            source.scope_notes_);
+        auto rows = transaction->execSqlSync(
+            "SELECT id,import_batch_id,source_id,title,source_type,publisher,"
+            "published_or_event_date,reliability,coverage,url,scope_notes "
+            "FROM import_sources WHERE import_batch_id=$1 AND source_id=$2",
+            batch_id, source.source_id_);
+        if (rows.empty()) {
+            return Result<ImportSourceRecord>::Err(DbError::kUnavailable);
+        }
+        return Result<ImportSourceRecord>::Ok(Source(rows[0]));
+    } catch (const drogon::orm::DrogonDbException& e) {
+        return Result<ImportSourceRecord>::Err(Map(e));
     }
 }
 
@@ -90,4 +208,29 @@ Result<ContentProvenanceRecord> ImportRepository::AddProvenance(
         return Result<ContentProvenanceRecord>::Err(Map(e));
     }
 }
-} // namespace placedb::db
+
+Result<std::optional<ContentProvenanceRecord>> ImportRepository::FindForTarget(
+    const drogon::orm::DbClientPtr& reader, const std::string& target_type,
+    std::int64_t target_id) const {
+    if (!reader || target_id <= 0
+        || (target_type != "question" && target_type != "experience")) {
+        return Result<std::optional<ContentProvenanceRecord>>::Err(
+            DbError::kConstraintViolation);
+    }
+    try {
+        auto rows = reader->execSqlSync(
+            "SELECT id,import_batch_id,target_type,target_id,source_table,"
+            "source_row_id,workbook_row,affiliation,confidence,campus_scope,"
+            "wording_fidelity,notes,original_row_sha256 "
+            "FROM content_provenance WHERE target_type=$1 AND target_id=$2",
+            target_type, target_id);
+        if (rows.empty()) {
+            return Result<std::optional<ContentProvenanceRecord>>::Ok(std::nullopt);
+        }
+        return Result<std::optional<ContentProvenanceRecord>>::Ok(
+            Provenance(rows[0]));
+    } catch (const drogon::orm::DrogonDbException& e) {
+        return Result<std::optional<ContentProvenanceRecord>>::Err(Map(e));
+    }
+}
+} /* namespace placedb::db */
