@@ -3,8 +3,16 @@
 
 #include "config/server_config.h"
 
+#include <memory>
+
+namespace placedb::app {
+class RequestExecutor;
+}
+
 namespace placedb::http {
-void RegisterSocialRoutes(const config::ServerConfig& config);
+void RegisterSocialRoutes(
+    const config::ServerConfig& config,
+    const std::shared_ptr<app::RequestExecutor>& request_db);
 }
 
 #endif

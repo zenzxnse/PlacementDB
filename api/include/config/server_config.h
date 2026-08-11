@@ -21,6 +21,18 @@ struct ServerConfig {
     std::string login_csrf_mac_key;
     std::string avatar_storage_path{"uploads/avatars"};
     bool secure_cookies{true};
+    bool search_worker_enabled{false};
+    std::string meilisearch_url;
+    std::string meilisearch_api_key;
+    std::string meilisearch_index{"placedb"};
+    std::string search_lease_owner;
+    std::size_t search_batch_size{25};
+    std::size_t search_poll_interval_ms{1000};
+    std::size_t search_failure_backoff_ms{5000};
+    std::size_t search_lease_seconds{60};
+    double meilisearch_timeout_seconds{10.0};
+    std::size_t request_db_workers{4};
+    std::size_t request_db_queue_capacity{128};
 };
 
 /** Reads PLACEDB_* variables and rejects unsafe or incomplete production input. */

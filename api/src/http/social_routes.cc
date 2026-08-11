@@ -1,5 +1,6 @@
 #include "http/social_routes.h"
 
+#include "app/request_executor.h"
 #include "auth/csrf.h"
 #include "auth/rate_limiter.h"
 #include "auth/secret.h"
@@ -15,11 +16,15 @@
 #include <drogon/drogon.h>
 #include <drogon/orm/Exception.h>
 
+#include <atomic>
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cstdint>
 #include <functional>
 #include <memory>
 #include <optional>
+#include <set>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -30,6 +35,63 @@ namespace {
 
 using Callback = std::function<void(const drogon::HttpResponsePtr&)>;
 
+drogon::HttpResponsePtr Error(ApiErrorCode code, std::string message,
+                              const std::string& request_id);
+
+template <typename Work>
+void Dispatch(const std::shared_ptr<app::RequestExecutor>& executor,
+              Callback&& callback, Work&& work) {
+    struct Completion {
+        explicit Completion(Callback input) : callback(std::move(input)) {}
+
+        void Complete(const drogon::HttpResponsePtr& response) noexcept {
+            if (completed.exchange(true)) return;
+            try {
+                callback(response);
+            } catch (...) {
+                // A framework callback failure must not escape an executor job.
+            }
+        }
+
+        Callback callback;
+        std::atomic_bool completed{false};
+    };
+
+    auto completion = std::make_shared<Completion>(std::move(callback));
+    const auto unavailable = [completion](const char* message) noexcept {
+        try {
+            completion->Complete(Error(ApiErrorCode::kServiceUnavailable,
+                                       message, ""));
+        } catch (...) {
+            // Error response construction can allocate; never unwind into Drogon.
+        }
+    };
+    if (!executor) {
+        unavailable("The server is busy. Try again shortly.");
+        return;
+    }
+
+    bool accepted = false;
+    try {
+        accepted = executor->Submit(
+        [completion, unavailable, task = std::forward<Work>(work)]() mutable {
+            try {
+                task(Callback([completion](const drogon::HttpResponsePtr& response) {
+                    completion->Complete(response);
+                }));
+            } catch (...) {
+                unavailable("The database request could not be completed.");
+            }
+        });
+    } catch (...) {
+        unavailable("The server is busy. Try again shortly.");
+        return;
+    }
+    if (!accepted) {
+        unavailable("The server is busy. Try again shortly.");
+    }
+}
+
 struct SocialState {
     explicit SocialState(const config::ServerConfig& input)
         : config(input), avatars(input.avatar_storage_path),
@@ -37,6 +99,7 @@ struct SocialState {
     config::ServerConfig config;
     storage::LocalAvatarStore avatars;
     auth::RateLimiter comment_limiter;
+    auth::RateLimiter report_limiter{{8, std::chrono::hours(1)}};
 };
 
 struct CurrentUser {
@@ -136,7 +199,21 @@ std::optional<std::int64_t> TargetId(const std::string& type,
     }
 }
 
-void ListComments(const std::string& type, const std::string& slug,
+bool IsUuid(const std::string& value) {
+    if (value.size() != 36) return false;
+    for (std::size_t index = 0; index < value.size(); ++index) {
+        if (index == 8 || index == 13 || index == 18 || index == 23) {
+            if (value[index] != '-') return false;
+        } else if (!std::isxdigit(static_cast<unsigned char>(value[index]))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void ListComments(const drogon::HttpRequestPtr& request,
+                  const SocialState& state,
+                  const std::string& type, const std::string& slug,
                   Callback&& callback) {
     const auto target = TargetId(type, slug);
     if (!target.has_value()) {
@@ -144,16 +221,43 @@ void ListComments(const std::string& type, const std::string& slug,
         return;
     }
     try {
+        const std::string cursor = request->getParameter("cursor");
+        std::int32_t limit = 50;
+        const std::string limit_text = request->getParameter("limit");
+        try {
+            if (!limit_text.empty()) limit = std::stoi(limit_text);
+        } catch (...) {
+            callback(Error(ApiErrorCode::kValidationFailed, "The comment limit is invalid.", ""));
+            return;
+        }
+        if (limit < 1 || limit > 100 || (!cursor.empty() && !IsUuid(cursor))) {
+            callback(Error(ApiErrorCode::kValidationFailed, "The comment cursor or limit is invalid.", ""));
+            return;
+        }
+        const auto current = Authenticate(request, state);
         const auto rows = drogon::app().getDbClient("default")->execSqlSync(
+            "WITH anchor AS (SELECT created_at,id FROM comments WHERE public_id="
+            "NULLIF($3,'')::uuid AND target_type=$1 AND target_id=$2 AND state='visible') "
             "SELECT c.public_id::text,u.username::text,u.display_name,"
-            "p.avatar_key,c.body,to_char(c.created_at AT TIME ZONE 'UTC',"
+            "p.avatar_key,c.author_id,c.body,to_char(c.created_at AT TIME ZONE 'UTC',"
             "'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS created_at "
             "FROM comments c JOIN users u ON u.id=c.author_id "
             "LEFT JOIN profiles p ON p.user_id=u.id "
             "WHERE c.target_type=$1 AND c.target_id=$2 AND c.state='visible' "
-            "ORDER BY c.created_at,c.id LIMIT 100", type, *target);
+            "AND ($3='' OR (c.created_at,c.id)>(SELECT created_at,id FROM anchor)) "
+            "ORDER BY c.created_at,c.id LIMIT $4", type, *target, cursor, limit + 1);
+        if (!cursor.empty() && rows.empty()) {
+            const auto anchor = drogon::app().getDbClient("default")->execSqlSync(
+                "SELECT 1 FROM comments WHERE public_id=$1::uuid AND target_type=$2 "
+                "AND target_id=$3 AND state='visible'", cursor, type, *target);
+            if (anchor.empty()) {
+                callback(Error(ApiErrorCode::kValidationFailed, "The comment cursor is invalid.", ""));
+                return;
+            }
+        }
+        const std::size_t count = std::min<std::size_t>(rows.size(), static_cast<std::size_t>(limit));
         std::string body = "{\"items\":[";
-        for (std::size_t index = 0; index < rows.size(); ++index) {
+        for (std::size_t index = 0; index < count; ++index) {
             if (index) body.push_back(',');
             const auto& row = rows[index];
             body += "{\"public_id\":" + dto::JsonString(row["public_id"].as<std::string>());
@@ -161,10 +265,15 @@ void ListComments(const std::string& type, const std::string& slug,
             body += ",\"author\":{\"username\":" + dto::JsonString(row["username"].as<std::string>());
             body += ",\"display_name\":" + dto::JsonString(row["display_name"].as<std::string>());
             body += ",\"avatar_url\":" + dto::JsonString(AvatarUrl(row["avatar_key"])) + "}";
-            body += ",\"created_at\":" + dto::JsonString(row["created_at"].as<std::string>()) + "}";
-            body.insert(body.size() - 1, ",\"can_report\":false");
+            const bool can_report = current.has_value() &&
+                current->user.id_ != row["author_id"].as<std::int64_t>();
+            body += ",\"created_at\":" + dto::JsonString(row["created_at"].as<std::string>());
+            body += std::string(",\"can_report\":") + (can_report ? "true" : "false") + "}";
         }
-        body += "],\"next_cursor\":null}";
+        body += "],\"next_cursor\":";
+        body += rows.size() > count
+            ? dto::JsonString(rows[count - 1]["public_id"].as<std::string>()) : "null";
+        body += "}";
         callback(Json(std::move(body)));
     } catch (const drogon::orm::DrogonDbException&) {
         callback(Error(ApiErrorCode::kServiceUnavailable,
@@ -239,12 +348,16 @@ void CreateComment(const drogon::HttpRequestPtr& request,
 
 }  // namespace
 
-void RegisterSocialRoutes(const config::ServerConfig& config) {
+void RegisterSocialRoutes(
+    const config::ServerConfig& config,
+    const std::shared_ptr<app::RequestExecutor>& request_db) {
     auto state = std::make_shared<SocialState>(config);
     drogon::app().registerHandler(
         "/api/v1/users/{1}",
-        [](const drogon::HttpRequestPtr&, Callback&& callback,
+        [request_db](const drogon::HttpRequestPtr&, Callback&& response_callback,
            const std::string& username) {
+            Dispatch(request_db, std::move(response_callback),
+                     [username](Callback callback) {
             try {
                 const auto rows = drogon::app().getDbClient("default")->execSqlSync(
                     "SELECT u.public_id::text,u.username::text,u.display_name,"
@@ -262,32 +375,56 @@ void RegisterSocialRoutes(const config::ServerConfig& config) {
                 callback(Error(ApiErrorCode::kServiceUnavailable,
                                "Profiles are temporarily unavailable.", ""));
             }
+            });
         }, {drogon::Get});
 
     drogon::app().registerHandler(
         "/api/v1/questions/by-slug/{1}/comments",
-        [](const drogon::HttpRequestPtr&, Callback&& callback,
-           const std::string& slug) { ListComments("question", slug, std::move(callback)); },
+        [state, request_db](const drogon::HttpRequestPtr& request, Callback&& response_callback,
+           const std::string& slug) {
+            Dispatch(request_db, std::move(response_callback), [request, state, slug](Callback callback) {
+                ListComments(request, *state, "question", slug, std::move(callback));
+            });
+        },
         {drogon::Get});
     drogon::app().registerHandler(
         "/api/v1/experiences/by-slug/{1}/comments",
-        [](const drogon::HttpRequestPtr&, Callback&& callback,
-           const std::string& slug) { ListComments("experience", slug, std::move(callback)); },
+        [state, request_db](const drogon::HttpRequestPtr& request, Callback&& response_callback,
+           const std::string& slug) {
+            Dispatch(request_db, std::move(response_callback), [request, state, slug](Callback callback) {
+                ListComments(request, *state, "experience", slug, std::move(callback));
+            });
+        },
         {drogon::Get});
     drogon::app().registerHandler(
         "/api/v1/questions/by-slug/{1}/comments",
-        [state](const drogon::HttpRequestPtr& request, Callback&& callback,
-           const std::string& slug) { CreateComment(request, state, "question", slug, std::move(callback)); },
+        [state, request_db](const drogon::HttpRequestPtr& request,
+                           Callback&& response_callback, const std::string& slug) {
+            Dispatch(request_db, std::move(response_callback),
+                     [request, state, slug](Callback callback) {
+                CreateComment(request, state, "question", slug,
+                              std::move(callback));
+            });
+        },
         {drogon::Post});
     drogon::app().registerHandler(
         "/api/v1/experiences/by-slug/{1}/comments",
-        [state](const drogon::HttpRequestPtr& request, Callback&& callback,
-           const std::string& slug) { CreateComment(request, state, "experience", slug, std::move(callback)); },
+        [state, request_db](const drogon::HttpRequestPtr& request,
+                           Callback&& response_callback, const std::string& slug) {
+            Dispatch(request_db, std::move(response_callback),
+                     [request, state, slug](Callback callback) {
+                CreateComment(request, state, "experience", slug,
+                              std::move(callback));
+            });
+        },
         {drogon::Post});
 
     drogon::app().registerHandler(
         "/api/v1/me/avatar",
-        [state](const drogon::HttpRequestPtr& request, Callback&& callback) {
+        [state, request_db](const drogon::HttpRequestPtr& request,
+                            Callback&& response_callback) {
+            Dispatch(request_db, std::move(response_callback),
+                     [request, state](Callback callback) {
             const std::string request_id = SelectRequestId(request->getHeader("x-request-id"), true);
             const auto current = Authenticate(request, *state);
             if (!current.has_value()) {
@@ -334,11 +471,15 @@ void RegisterSocialRoutes(const config::ServerConfig& config) {
                 callback(Error(ApiErrorCode::kServiceUnavailable,
                                "Avatar storage is temporarily unavailable.", request_id));
             }
+            });
         }, {drogon::Post});
 
     drogon::app().registerHandler(
         "/api/v1/me/avatar",
-        [state](const drogon::HttpRequestPtr& request, Callback&& callback) {
+        [state, request_db](const drogon::HttpRequestPtr& request,
+                            Callback&& response_callback) {
+            Dispatch(request_db, std::move(response_callback),
+                     [request, state](Callback callback) {
             const std::string request_id = SelectRequestId(request->getHeader("x-request-id"), true);
             const auto current = Authenticate(request, *state);
             if (!current.has_value()) {
@@ -361,11 +502,15 @@ void RegisterSocialRoutes(const config::ServerConfig& config) {
                 callback(Error(ApiErrorCode::kServiceUnavailable,
                                "The avatar could not be removed.", request_id));
             }
+            });
         }, {drogon::Delete});
 
     drogon::app().registerHandler(
         "/api/v1/me/profile",
-        [state](const drogon::HttpRequestPtr& request, Callback&& callback) {
+        [state, request_db](const drogon::HttpRequestPtr& request,
+                            Callback&& response_callback) {
+            Dispatch(request_db, std::move(response_callback),
+                     [request, state](Callback callback) {
             const std::string request_id = SelectRequestId(request->getHeader("x-request-id"), true);
             const auto current = Authenticate(request, *state);
             if (!current.has_value()) {
@@ -411,12 +556,16 @@ void RegisterSocialRoutes(const config::ServerConfig& config) {
                 callback(Error(ApiErrorCode::kServiceUnavailable,
                                "The profile could not be saved.", request_id));
             }
+            });
         }, {drogon::Patch});
 
     drogon::app().registerHandler(
         "/api/v1/comments/{1}",
-        [state](const drogon::HttpRequestPtr& request, Callback&& callback,
+        [state, request_db](const drogon::HttpRequestPtr& request,
+                Callback&& response_callback,
                 const std::string& public_id) {
+            Dispatch(request_db, std::move(response_callback),
+                     [request, state, public_id](Callback callback) {
             const std::string request_id = SelectRequestId(request->getHeader("x-request-id"), true);
             const auto current = Authenticate(request, *state);
             if (!current.has_value()) {
@@ -440,7 +589,77 @@ void RegisterSocialRoutes(const config::ServerConfig& config) {
                 callback(Error(ApiErrorCode::kServiceUnavailable,
                                "The comment could not be deleted.", request_id));
             }
+            });
         }, {drogon::Delete});
+
+    drogon::app().registerHandler(
+        "/api/v1/comments/{1}/reports",
+        [state, request_db](const drogon::HttpRequestPtr& request,
+                Callback&& response_callback, const std::string& public_id) {
+            Dispatch(request_db, std::move(response_callback),
+                     [request, state, public_id](Callback callback) {
+            const std::string request_id = SelectRequestId(
+                request->getHeader("x-request-id"), true);
+            const auto current = Authenticate(request, *state);
+            if (!current.has_value()) {
+                callback(Error(ApiErrorCode::kAuthRequired, "Sign in is required.", request_id)); return;
+            }
+            if (!TrustedMutation(request, *state, *current)) {
+                callback(Error(ApiErrorCode::kCsrfFailed, "The CSRF token was not accepted.", request_id)); return;
+            }
+            if (!IsUuid(public_id)) {
+                callback(Error(ApiErrorCode::kNotFound, "That comment does not exist.", request_id)); return;
+            }
+            const auto policy = CheckJsonMutation("POST", request->getHeader("content-type"),
+                                                   request->body().size(), 4U * 1024U);
+            if (policy != RequestPolicyDecision::kAllow) {
+                callback(Error(policy == RequestPolicyDecision::kPayloadTooLarge
+                    ? ApiErrorCode::kPayloadTooLarge : ApiErrorCode::kUnsupportedMediaType,
+                    "The report request could not be accepted.", request_id)); return;
+            }
+            const auto json = request->getJsonObject();
+            static const std::set<std::string> reasons{
+                "spam", "offensive", "duplicate", "incorrect", "personal_info", "other"};
+            const auto names = json ? json->getMemberNames() : std::vector<std::string>{};
+            if (!json || !(*json)["reason"].isString() ||
+                !reasons.contains((*json)["reason"].asString()) ||
+                std::any_of(names.begin(), names.end(),
+                    [](const std::string& key) { return key != "reason" && key != "details"; }) ||
+                (json->isMember("details") && !(*json)["details"].isString()) ||
+                (*json).get("details", "").asString().size() > 1000) {
+                callback(Error(ApiErrorCode::kValidationFailed, "The report was not valid.", request_id)); return;
+            }
+            const auto rate = state->report_limiter.Consume(
+                std::to_string(current->user.id_), std::chrono::steady_clock::now());
+            if (!rate.allowed) {
+                callback(Error(ApiErrorCode::kRateLimited, "Too many reports. Please wait.", request_id)); return;
+            }
+            try {
+                const auto rows = drogon::app().getDbClient("default")->execSqlSync(
+                    "INSERT INTO content_reports(reporter_id,target_type,target_id,reason,details) "
+                    "SELECT $2,'comment',c.id,$3,NULLIF($4,'') FROM comments c "
+                    "WHERE c.public_id=$1::uuid AND c.state='visible' AND c.author_id<>$2 "
+                    "RETURNING public_id::text,state,to_char(created_at AT TIME ZONE 'UTC',"
+                    "'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') created_at",
+                    public_id, current->user.id_, (*json)["reason"].asString(),
+                    (*json).get("details", "").asString());
+                if (rows.empty()) {
+                    callback(Error(ApiErrorCode::kNotFound, "That comment does not exist.", request_id)); return;
+                }
+                std::string body = "{\"public_id\":" + dto::JsonString(rows[0]["public_id"].as<std::string>());
+                body += ",\"state\":\"open\",\"created_at\":" +
+                    dto::JsonString(rows[0]["created_at"].as<std::string>()) + "}";
+                callback(Json(std::move(body), drogon::k201Created));
+            } catch (const drogon::orm::DrogonDbException& error) {
+                const std::string detail = error.base().what();
+                callback(Error(detail.find("content_reports_one_open_idx") != std::string::npos
+                    ? ApiErrorCode::kConflict : ApiErrorCode::kServiceUnavailable,
+                    detail.find("content_reports_one_open_idx") != std::string::npos
+                        ? "You already have an open report for that comment."
+                        : "The report could not be saved.", request_id));
+            }
+            });
+        }, {drogon::Post});
 
     drogon::app().registerHandler(
         "/api/v1/avatars/{1}",

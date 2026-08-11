@@ -21,13 +21,13 @@
 
 		<nav class="topbar-links" aria-label="Secondary">
 			<a href="/about">About</a>
-			<a href="/companies">Companies</a>
+			<a href="/about/help">Help</a>
 		</nav>
 
 		<!-- GET so a search is a shareable URL and works with JavaScript off. -->
 		<form class="topbar-search" method="get" action="/search" role="search">
 			<label class="visually-hidden" for="global-search">Search questions and experiences</label>
-			<span class="topbar-search-icon"><Icon name="search" size={17} /></span>
+			<span class="topbar-search-icon" aria-hidden="true"><Icon name="search" size={17} /></span>
 			<input
 				id="global-search"
 				type="search"
@@ -36,16 +36,17 @@
 				placeholder="Search questions, companies, topics"
 				autocomplete="off"
 			/>
+			<!--
+				A submit control is required so the form is operable without relying
+				on implicit Enter-key submission. Visually hidden because the icon's
+				affordance already signals the form's purpose; the button is in the
+				tab order and discoverable to assistive tech.
+			-->
+			<button type="submit" class="visually-hidden">Search</button>
 		</form>
 
 		<div class="topbar-actions">
 			{#if me}
-				<a class="topbar-action" href="/account/inbox">
-					<Icon name="bell" size={18} label="Inbox" />
-				</a>
-				<a class="topbar-action" href="/account/activity">
-					<Icon name="trophy" size={18} label="Your activity" />
-				</a>
 				<a class="topbar-identity" href="/u/{me.username}">
 					<Icon name="user" size={18} />
 					<span>{me.display_name}</span>
@@ -54,10 +55,11 @@
 					<button type="submit" class="link-button">Log out</button>
 				</form>
 			{:else}
-				<a class="topbar-action" href="/about/help">
-					<Icon name="help" size={18} label="Help" />
+				<a class="topbar-action" href="/about/help" aria-label="Help">
+					<Icon name="help" size={18} />
 				</a>
 				<a class="topbar-login" href="/login">Log in</a>
+				<a class="topbar-login" href="/register">Sign up</a>
 			{/if}
 		</div>
 	</div>

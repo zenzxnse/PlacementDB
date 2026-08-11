@@ -156,7 +156,7 @@ export const fixtureQuestions: Question[] = [
 		topics: [os],
 		author: null,
 		published_at: '2026-08-06T07:40:00Z',
-		difficulty: { mean: null, vote_count: 0 }
+		difficulty: { mean: 3.0, vote_count: 0 }
 	}
 ];
 

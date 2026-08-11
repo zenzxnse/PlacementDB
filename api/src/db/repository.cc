@@ -272,6 +272,27 @@ Result<void> QuestionRepository::SubmitForReview(
     }
 }
 
+Result<QuestionRecord> QuestionRepository::FindOwnedEditable(
+    const drogon::orm::DbClientPtr& trans, const std::string& public_id,
+    std::int64_t author_id) const {
+    try {
+        auto r=trans->execSqlSync("SELECT id,public_id::text,slug,title,author_id,company_id,role_title,job_role_id,prompt,answer_guidance,round,source_year,state,published_at::text,created_at::text,updated_at::text FROM questions WHERE public_id::text=$1 AND author_id=$2 AND state IN ('draft','changes_requested')",public_id,author_id);
+        if(r.empty()) return Result<QuestionRecord>::Err(DbError::kNotFound);
+        return Result<QuestionRecord>::Ok(RowToQuestion(r[0]));
+    } catch(const drogon::orm::DrogonDbException&e){return Result<QuestionRecord>::Err(MapException(e));}
+}
+
+Result<QuestionRecord> QuestionRepository::ReplaceDraft(
+    const drogon::orm::DbClientPtr& trans, std::int64_t id,
+    const std::string& expected, std::optional<std::int64_t> company_id,
+    const std::string& title,const std::string& prompt,
+    std::optional<std::string> guidance,std::optional<std::int64_t> role_id,
+    std::optional<std::string> round,std::optional<std::int16_t> year) const {
+    try { auto r=trans->execSqlSync("UPDATE questions SET company_id=$1,title=$2,prompt=$3,answer_guidance=$4,role_title=NULL,job_role_id=$5,round=$6,source_year=$7,state=CASE WHEN state='changes_requested' THEN 'pending_review' ELSE state END,updated_at=now() WHERE id=$8 AND updated_at=$9::timestamptz AND state IN ('draft','changes_requested') RETURNING id,public_id::text,slug,title,author_id,company_id,role_title,job_role_id,prompt,answer_guidance,round,source_year,state,published_at::text,created_at::text,updated_at::text",company_id,title,prompt,guidance,role_id,round,year,id,expected); if(r.empty())return Result<QuestionRecord>::Err(DbError::kConflict); return Result<QuestionRecord>::Ok(RowToQuestion(r[0]));}catch(const drogon::orm::DrogonDbException&e){return Result<QuestionRecord>::Err(MapException(e));}
+}
+
+Result<void> QuestionRepository::ReplaceTopics(const drogon::orm::DbClientPtr& trans,std::int64_t id,const std::vector<std::int64_t>& topics) const {try{trans->execSqlSync("DELETE FROM question_topics WHERE question_id=$1",id);for(auto topic:topics)trans->execSqlSync("INSERT INTO question_topics(question_id,topic_id) VALUES($1,$2)",id,topic);return Result<void>::Ok();}catch(const drogon::orm::DrogonDbException&e){return Result<void>::Err(MapException(e));}}
+
 Result<void> QuestionRepository::Moderate(
     const drogon::orm::DbClientPtr& trans,
     std::int64_t question_id,
@@ -440,6 +461,12 @@ Result<void> ExperienceRepository::SubmitForReview(
     }
 }
 
+Result<ExperienceRecord> ExperienceRepository::FindOwnedEditable(const drogon::orm::DbClientPtr& trans,const std::string& public_id,std::int64_t author_id) const {try{auto r=trans->execSqlSync("SELECT id,public_id::text,slug,title,author_id,company_id,role_title,job_role_id,source_year,narrative,outcome,outcome_visible,anonymous,state,published_at::text,created_at::text,updated_at::text FROM experiences WHERE public_id::text=$1 AND author_id=$2 AND state IN ('draft','changes_requested')",public_id,author_id);if(r.empty())return Result<ExperienceRecord>::Err(DbError::kNotFound);return Result<ExperienceRecord>::Ok(RowToExperience(r[0]));}catch(const drogon::orm::DrogonDbException&e){return Result<ExperienceRecord>::Err(MapException(e));}}
+
+Result<ExperienceRecord> ExperienceRepository::ReplaceDraft(const drogon::orm::DbClientPtr& trans,std::int64_t id,const std::string& expected,std::optional<std::int64_t> company_id,const std::string& title,const std::string& narrative,std::optional<std::int64_t> role_id,std::optional<std::int16_t> year,std::optional<std::string> outcome,bool visible,bool anonymous) const {try{auto r=trans->execSqlSync("UPDATE experiences SET company_id=$1,title=$2,narrative=$3,role_title=NULL,job_role_id=$4,source_year=$5,outcome=$6,outcome_visible=$7,anonymous=$8,state=CASE WHEN state='changes_requested' THEN 'pending_review' ELSE state END,updated_at=now() WHERE id=$9 AND updated_at=$10::timestamptz AND state IN ('draft','changes_requested') RETURNING id,public_id::text,slug,title,author_id,company_id,role_title,job_role_id,source_year,narrative,outcome,outcome_visible,anonymous,state,published_at::text,created_at::text,updated_at::text",company_id,title,narrative,role_id,year,outcome,visible,anonymous,id,expected);if(r.empty())return Result<ExperienceRecord>::Err(DbError::kConflict);return Result<ExperienceRecord>::Ok(RowToExperience(r[0]));}catch(const drogon::orm::DrogonDbException&e){return Result<ExperienceRecord>::Err(MapException(e));}}
+
+Result<void> ExperienceRepository::ReplaceRounds(const drogon::orm::DbClientPtr& trans,std::int64_t id,const std::vector<std::pair<std::string,std::optional<std::string>>>& rounds) const {try{trans->execSqlSync("DELETE FROM experience_rounds WHERE experience_id=$1",id);std::int16_t ordinal=1;for(const auto& [round,notes]:rounds)trans->execSqlSync("INSERT INTO experience_rounds(experience_id,ordinal,round,notes) VALUES($1,$2,$3,$4)",id,ordinal++,round,notes);return Result<void>::Ok();}catch(const drogon::orm::DrogonDbException&e){return Result<void>::Err(MapException(e));}}
+
 Result<void> ExperienceRepository::Moderate(
     const drogon::orm::DbClientPtr& trans,
     std::int64_t experience_id,
@@ -483,21 +510,24 @@ Result<void> DifficultyVoteRepository::Upsert(
     std::int64_t user_id,
     std::int16_t value) const {
     try {
-        auto existing = client_->execSqlSync(
+        auto transaction = client_->newTransaction();
+        auto existing = transaction->execSqlSync(
             "SELECT id, cleared_at FROM difficulty_votes "
             "WHERE question_id = $1 AND user_id = $2 AND cleared_at IS NULL",
             question_id, user_id);
         if (!existing.empty()) {
-            client_->execSqlSync(
+            transaction->execSqlSync(
                 "UPDATE difficulty_votes SET value = $1, updated_at = now() "
                 "WHERE id = $2",
                 value, existing[0]["id"].as<std::int64_t>());
         } else {
-            client_->execSqlSync(
+            transaction->execSqlSync(
                 "INSERT INTO difficulty_votes (question_id, user_id, value) "
                 "VALUES ($1, $2, $3)",
                 question_id, user_id, value);
         }
+        transaction->execSqlSync(
+            "SELECT placedb_refresh_question_difficulty($1)", question_id);
         return Result<void>::Ok();
     } catch (const drogon::orm::DrogonDbException& e) {
         return Result<void>::Err(MapException(e));
@@ -522,12 +552,12 @@ Result<DifficultyAggregate> DifficultyVoteRepository::Aggregate(
     std::int64_t question_id) const {
     try {
         auto result = client_->execSqlSync(
-            "SELECT COALESCE(ROUND(AVG(value)::numeric, 1), 0)::float8 AS mean, "
-            "COUNT(*)::int AS cnt FROM difficulty_votes "
-            "WHERE question_id = $1 AND cleared_at IS NULL",
+            "SELECT ((9.0 + weighted_sum) / (3.0 + weight_sum))::float8 AS mean, "
+            "vote_count::int AS cnt FROM question_difficulty_scores "
+            "WHERE question_id = $1",
             question_id);
         if (result.empty()) {
-            return Result<DifficultyAggregate>::Err(DbError::kNotFound);
+            return Result<DifficultyAggregate>::Ok({3.0, 0});
         }
         DifficultyAggregate agg;
         agg.mean_ = result[0]["mean"].as<double>();
@@ -926,6 +956,39 @@ Result<UserRecord> UserRepository::FindLoginCandidate(
         value.status_ = rows[0]["status"].as<std::string>();
         value.is_system_ = rows[0]["is_system"].as<bool>();
         value.password_hash_ = rows[0]["password_hash"].as<std::string>();
+        value.created_at_ = rows[0]["created_at"].as<std::string>();
+        value.updated_at_ = rows[0]["updated_at"].as<std::string>();
+        return Result<UserRecord>::Ok(std::move(value));
+    } catch (const drogon::orm::DrogonDbException& e) {
+        return Result<UserRecord>::Err(MapException(e));
+    }
+}
+
+Result<UserRecord> UserRepository::Create(
+    const drogon::orm::DbClientPtr& transaction,
+    const std::string& username,
+    const std::string& email,
+    const std::string& display_name,
+    const std::string& password_hash) const {
+    try {
+        auto rows = transaction->execSqlSync(
+            "INSERT INTO users "
+            "(username, email, display_name, password_hash, role_id) "
+            "SELECT $1, $2, $3, $4, id FROM roles WHERE name = 'user' "
+            "RETURNING id, public_id::text, username, email, display_name, "
+            "'user'::text AS role_name, status, is_system, created_at::text, "
+            "updated_at::text",
+            username, email, display_name, password_hash);
+        if (rows.empty()) return Result<UserRecord>::Err(DbError::kUnavailable);
+        UserRecord value;
+        value.id_ = rows[0]["id"].as<std::int64_t>();
+        value.public_id_ = rows[0]["public_id"].as<std::string>();
+        value.username_ = rows[0]["username"].as<std::string>();
+        value.email_ = rows[0]["email"].as<std::string>();
+        value.display_name_ = rows[0]["display_name"].as<std::string>();
+        value.role_name_ = rows[0]["role_name"].as<std::string>();
+        value.status_ = rows[0]["status"].as<std::string>();
+        value.is_system_ = rows[0]["is_system"].as<bool>();
         value.created_at_ = rows[0]["created_at"].as<std::string>();
         value.updated_at_ = rows[0]["updated_at"].as<std::string>();
         return Result<UserRecord>::Ok(std::move(value));

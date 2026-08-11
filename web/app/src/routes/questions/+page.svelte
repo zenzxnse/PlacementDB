@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { buildQuestionQuery, hasActiveFilters } from '$lib/query';
-	import { difficultySummary, roundLabel , companyName } from '$lib/format';
+	import { difficultySummary, roundLabel , companyName, DIFFICULTY_LEVELS } from '$lib/format';
 	import type { Sort } from '$lib/types';
 
 	let { data }: { data: PageData } = $props();
@@ -76,9 +76,9 @@
 		<label for="filter-difficulty">Difficulty</label>
 		<select id="filter-difficulty" name="difficulty">
 			<option value="">Any difficulty</option>
-			{#each [1, 2, 3, 4, 5] as level}
-				<option value={String(level)} selected={selected(filters.difficulty, String(level))}
-					>{level} of 5</option
+			{#each DIFFICULTY_LEVELS as level}
+				<option value={String(level.value)} selected={selected(filters.difficulty, String(level.value))}
+					>{level.value} &#8212; {level.name}</option
 				>
 			{/each}
 		</select>

@@ -1,11 +1,29 @@
 #include "ranking/ranking.h"
+#include "ranking/difficulty_score.h"
 
 #include <cassert>
 #include <chrono>
 #include <string>
+#include <stdexcept>
 #include <vector>
 
 namespace placedb::ranking {
+
+void WeightedDifficultyContract() {
+    const auto empty = ComputeDifficultyScore({});
+    assert(empty.mean == 3.0 && empty.vote_count == 0);
+    const auto one = ComputeDifficultyScore({{5, 1.0}});
+    assert(one.mean == 3.5 && one.vote_count == 1);
+    assert(DifficultyVoterWeight(0) == 1.0);
+    assert(DifficultyVoterWeight(1000000) == 3.0);
+    const auto first = ComputeDifficultyScore({{1, 1.0}, {5, 3.0}});
+    const auto second = ComputeDifficultyScore({{5, 3.0}, {1, 1.0}});
+    assert(first.mean == second.mean);
+    bool rejected = false;
+    try { (void)ComputeDifficultyScore({{6, 1.0}}); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+}
 
 void HotScoreMonotonicallyNonIncreasing() {
     const double published_at = 1785585600.0;
@@ -76,6 +94,7 @@ void RankingCursorRequiresMatchingAsOf() {
 } /* namespace placedb::ranking */
 
 int main() {
+    placedb::ranking::WeightedDifficultyContract();
     placedb::ranking::HotScoreMonotonicallyNonIncreasing();
     placedb::ranking::HotScoreOrderingAndReplay();
     placedb::ranking::StrictUtcTimestampParsing();

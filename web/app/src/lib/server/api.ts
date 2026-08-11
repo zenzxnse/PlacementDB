@@ -2,6 +2,7 @@ import type { Cookies, RequestEvent } from '@sveltejs/kit';
 import { API_BASE, LOGIN_TIMEOUT_MS, PUBLIC_ORIGIN, READ_TIMEOUT_MS } from './config';
 import type { ApiErrorBody, ApiFieldError } from '$lib/types';
 import { kindForStatus, makeFailure, parseRetryAfter, type Failure } from '$lib/failure';
+import { WireError, type Parser } from '$lib/wire';
 
 /**
  * Typed server-side client for Drogon.
@@ -52,10 +53,17 @@ export class ApiError extends Error {
 		/* SEARCH_UNAVAILABLE is a dependency problem whatever status carries it. */
 		const kind =
 			this.code === 'SEARCH_UNAVAILABLE' ? 'dependency' : kindForStatus(this.status);
+		/*
+		 * Spread rather than assign undefined: under exactOptionalPropertyTypes
+		 * an absent optional and one explicitly set to undefined are different
+		 * types, and the second is what makes "has a request ID" checks lie.
+		 */
 		return makeFailure(kind, {
 			message: this.message,
 			requestId: this.requestId,
-			retryAfterSeconds: this.retryAfterSeconds,
+			...(this.retryAfterSeconds === undefined
+				? {}
+				: { retryAfterSeconds: this.retryAfterSeconds }),
 			fields: this.fields.map((f) => ({ field: f.field, message: f.message }))
 		});
 	}
@@ -119,6 +127,17 @@ interface CallOptions {
 	headers?: Record<string, string>;
 }
 
+/**
+ * A call that wants a typed result must supply the parser that produces it.
+ *
+ * There is deliberately no way to name a type parameter and skip the check.
+ * That was the old shape, and it meant 23 call sites asserted a type nobody
+ * verified. Calls that ignore the body omit `parse` and get `unknown`.
+ */
+interface TypedCallOptions<T> extends CallOptions {
+	parse: Parser<T>;
+}
+
 function buildCookieHeader(cookies: Cookies): string {
 	const parts: string[] = [];
 	for (const name of FORWARDED_COOKIES) {
@@ -148,6 +167,8 @@ function forwardSetCookies(response: Response, cookies: Cookies): void {
 	const allowed = new Set<string>(FORWARDED_COOKIES);
 	for (const header of raw) {
 		const [pair, ...attributes] = header.split(';');
+		/* split always yields at least one element, but the type does not say so. */
+		if (pair === undefined) continue;
 		const equals = pair.indexOf('=');
 		if (equals <= 0) continue;
 		const name = pair.slice(0, equals).trim();
@@ -167,7 +188,7 @@ function forwardSetCookies(response: Response, cookies: Cookies): void {
 		let sameSite: 'lax' | 'strict' | 'none' = 'lax';
 
 		for (const attribute of attributes) {
-			const [key, attrValue = ''] = attribute.split('=');
+			const [key = '', attrValue = ''] = attribute.split('=');
 			switch (key.trim().toLowerCase()) {
 				case 'path':
 					path = attrValue.trim() || '/';
@@ -237,8 +258,18 @@ async function parseError(response: Response, fallbackStatus: number): Promise<A
 export async function apiCall<T>(
 	event: Pick<RequestEvent, 'cookies' | 'fetch' | 'request'>,
 	path: string,
-	options: CallOptions = {}
-): Promise<T> {
+	options: TypedCallOptions<T>
+): Promise<T>;
+export async function apiCall(
+	event: Pick<RequestEvent, 'cookies' | 'fetch' | 'request'>,
+	path: string,
+	options?: CallOptions
+): Promise<unknown>;
+export async function apiCall<T>(
+	event: Pick<RequestEvent, 'cookies' | 'fetch' | 'request'>,
+	path: string,
+	options: CallOptions & { parse?: Parser<T> } = {}
+): Promise<T | unknown> {
 	const method = options.method ?? 'GET';
 	const timeout = options.timeoutMs ?? READ_TIMEOUT_MS;
 
@@ -322,7 +353,8 @@ export async function apiCall<T>(
 		throw await parseError(response, response.status);
 	}
 	if (response.status === 204) {
-		return undefined as T;
+		/* No body to validate. Callers that need a value do not use 204 routes. */
+		return undefined;
 	}
 
 	/*
@@ -344,10 +376,27 @@ export async function apiCall<T>(
 	if (raw.length > MAX_RESPONSE_BYTES) {
 		throw new ApiMalformed(`response too large: ${raw.length}`);
 	}
+	let parsed: unknown;
 	try {
-		return JSON.parse(raw) as T;
+		parsed = JSON.parse(raw);
 	} catch (cause) {
 		throw new ApiMalformed(`invalid JSON: ${String(cause)}`);
+	}
+
+	/*
+	 * Well-formed JSON is not the same as the response we asked for. A body
+	 * that parses but does not match the wire type is a malformed response, and
+	 * takes the same honest failure path as a non-JSON body rather than
+	 * flowing on as a value the rest of the app believes.
+	 */
+	if (!options.parse) return parsed;
+	try {
+		return options.parse(parsed);
+	} catch (cause) {
+		if (cause instanceof WireError) {
+			throw new ApiMalformed(`wire mismatch at ${cause.path}: ${cause.detail}`);
+		}
+		throw new ApiMalformed(`wire mismatch: ${String(cause)}`);
 	}
 }
 
@@ -366,8 +415,20 @@ export async function apiUpload<T>(
 	event: Pick<RequestEvent, 'cookies' | 'fetch' | 'request'>,
 	path: string,
 	form: FormData,
-	options: { csrfToken?: string; timeoutMs?: number } = {}
-): Promise<T> {
+	options: { csrfToken?: string; timeoutMs?: number; parse: Parser<T> }
+): Promise<T>;
+export async function apiUpload(
+	event: Pick<RequestEvent, 'cookies' | 'fetch' | 'request'>,
+	path: string,
+	form: FormData,
+	options?: { csrfToken?: string; timeoutMs?: number }
+): Promise<unknown>;
+export async function apiUpload<T>(
+	event: Pick<RequestEvent, 'cookies' | 'fetch' | 'request'>,
+	path: string,
+	form: FormData,
+	options: { csrfToken?: string; timeoutMs?: number; parse?: Parser<T> } = {}
+): Promise<T | unknown> {
 	const controller = new AbortController();
 	const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? UPLOAD_TIMEOUT_MS);
 
@@ -400,14 +461,33 @@ export async function apiUpload<T>(
 	if (!contentType.toLowerCase().includes('application/json')) {
 		throw new ApiMalformed(`unexpected content-type: ${contentType || 'none'}`);
 	}
-	return (await response.json()) as T;
+	const parsed: unknown = await response.json();
+	if (!options.parse) return parsed;
+	try {
+		return options.parse(parsed);
+	} catch (cause) {
+		if (cause instanceof WireError) {
+			throw new ApiMalformed(`wire mismatch at ${cause.path}: ${cause.detail}`);
+		}
+		throw new ApiMalformed(`wire mismatch: ${String(cause)}`);
+	}
 }
 
 /** Convenience wrapper for the slower credential path. */
 export function apiLoginCall<T>(
 	event: Pick<RequestEvent, 'cookies' | 'fetch' | 'request'>,
 	path: string,
-	options: CallOptions = {}
-): Promise<T> {
-	return apiCall<T>(event, path, { ...options, timeoutMs: LOGIN_TIMEOUT_MS });
+	options: TypedCallOptions<T>
+): Promise<T>;
+export function apiLoginCall(
+	event: Pick<RequestEvent, 'cookies' | 'fetch' | 'request'>,
+	path: string,
+	options?: CallOptions
+): Promise<unknown>;
+export function apiLoginCall<T>(
+	event: Pick<RequestEvent, 'cookies' | 'fetch' | 'request'>,
+	path: string,
+	options: CallOptions & { parse?: Parser<T> } = {}
+): Promise<T | unknown> {
+	return apiCall(event, path, { ...options, timeoutMs: LOGIN_TIMEOUT_MS });
 }

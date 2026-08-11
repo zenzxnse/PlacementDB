@@ -1,27 +1,55 @@
 import { error, fail } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { getQuestion, getMe, listComments } from '$lib/server/content';
-import { apiCall, toFailure } from '$lib/server/api';
-import { COMMENT_MAX_LENGTH } from '$lib/types';
+import { getQuestion, getMe, listComments, loginWithReturn } from '$lib/server/content';
+import { apiCall, ApiError, toFailure } from '$lib/server/api';
+import { parseCsrf, parseDifficultyVote } from '$lib/wire';
+import {
+	COMMENT_MAX_LENGTH,
+	DIFFICULTY_MAX,
+	DIFFICULTY_MIN,
+	type CommentPage,
+	type DifficultyVoteResult
+} from '$lib/types';
+import type { Failure } from '$lib/failure';
 import type { Actions } from './$types';
 
 export const load: PageServerLoad = async (event) => {
 	const question = await getQuestion(event, event.params.slug);
 	if (!question) error(404, 'That question does not exist.');
-	const [me, comments] = await Promise.all([
+	/*
+	 * getMe degrades internally to anonymous; listComments does not. Without
+	 * settling it here, a comment-endpoint outage takes down the whole
+	 * question page even though the prompt and author render fine. Settling
+	 * lets the page show the article and an honest "comments unavailable"
+	 * panel instead.
+	 */
+	const [meResult, commentsResult] = await Promise.allSettled([
 		getMe(event),
 		listComments(event, 'questions', event.params.slug,
 			event.url.searchParams.get('after') ?? undefined)
 	]);
+	const me = meResult.status === 'fulfilled' ? meResult.value : null;
+	let comments: CommentPage = { items: [], next_cursor: null };
+	let commentsError: Failure | null = null;
+	if (commentsResult.status === 'fulfilled') {
+		comments = commentsResult.value;
+	} else {
+		commentsError = toFailure(commentsResult.reason);
+	}
 	let csrfToken = '';
 	if (me) {
+		/*
+		 * Issued whenever there is a session, not only when comments loaded.
+		 * The difficulty vote needs the same token, and a comment outage must
+		 * not silently disable rating.
+		 */
 		try {
-			csrfToken = (await apiCall<{ csrf_token: string }>(event, '/auth/csrf')).csrf_token;
+			csrfToken = (await apiCall(event, '/auth/csrf', { parse: parseCsrf })).csrf_token;
 		} catch {
-			/* Comment form renders disabled; the action refuses without a token. */
+			/* Both forms render disabled; the actions refuse without a token. */
 		}
 	}
-	return { question, me, comments, csrfToken };
+	return { question, me, comments, commentsError, csrfToken };
 };
 
 export const actions: Actions = {
@@ -52,5 +80,70 @@ export const actions: Actions = {
 		}
 		/* Redirect after post so a reload does not repost the comment. */
 		return { commentPosted: true };
+	},
+
+	/**
+	 * Difficulty vote, per section 4 of the accepted account/submission/
+	 * difficulty contract. PUT is idempotent: it creates or changes the single
+	 * active vote for this user and question.
+	 *
+	 * The question's public ID is re-derived from the slug rather than taken
+	 * from a hidden field, so a tampered form cannot aim the vote at another
+	 * question. The API authorizes it too; this just refuses to be the tool.
+	 *
+	 * Never automatically retried, per the resilience rules for mutations.
+	 */
+	vote: async (event) => {
+		const form = await event.request.formData();
+		const token = String(form.get('_csrf') ?? '');
+		const raw = String(form.get('value') ?? '');
+		if (token.length === 0) {
+			return fail(403, { voteError: 'This form expired. Reload the page and try again.' });
+		}
+		const value = Number(raw);
+		if (!Number.isInteger(value) || value < DIFFICULTY_MIN || value > DIFFICULTY_MAX) {
+			return fail(400, {
+				voteError: `Choose a difficulty from ${DIFFICULTY_MIN} to ${DIFFICULTY_MAX}.`
+			});
+		}
+
+		const question = await getQuestion(event, event.params.slug);
+		if (!question) error(404, 'That question does not exist.');
+
+		try {
+			const result = await apiCall(
+				event,
+				`/questions/${encodeURIComponent(question.public_id)}/difficulty`,
+				{
+					method: 'PUT',
+					headers: { 'x-csrf-token': token },
+					body: { value },
+					parse: parseDifficultyVote
+				}
+			);
+			return { difficulty: result.difficulty, myVote: result.my_vote };
+		} catch (error_) {
+			if (error_ instanceof ApiError) {
+				if (error_.status === 401) {
+					return fail(401, {
+						voteError: 'Your session expired. Log in again to rate this question.',
+						voteLoginHref: loginWithReturn(`/questions/${event.params.slug}`)
+					});
+				}
+				if (error_.status === 403) {
+					return fail(403, { voteError: 'You cannot rate this question.' });
+				}
+				if (error_.status === 429) {
+					const wait = error_.retryAfterSeconds;
+					return fail(429, {
+						voteError: wait
+							? `Too many ratings. Try again in about ${wait} seconds.`
+							: 'Too many ratings. Try again later.'
+					});
+				}
+			}
+			/* Everything else keeps only the safe classified message. */
+			return fail(502, { voteError: toFailure(error_).message });
+		}
 	}
 };

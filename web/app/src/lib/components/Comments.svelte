@@ -25,7 +25,7 @@
 		me: Me | null;
 		action: string;
 		csrfToken: string;
-		error?: string;
+		error?: string | undefined;
 		nextCursor?: string | null;
 	} = $props();
 </script>
@@ -68,7 +68,15 @@
 
 	{#if me}
 		{#if error}
-			<div class="error-summary" role="alert" tabindex="-1">{error}</div>
+			<!--
+				Error summary: an explicit heading inside lets a screen reader
+				user locate the failure as the next heading inside the section.
+				tabindex="-1" makes it programmatically focusable.
+			-->
+			<div class="error-summary" role="alert" tabindex="-1">
+				<h2>Comment was not posted</h2>
+				<p>{error}</p>
+			</div>
 		{/if}
 		<form method="post" {action} class="stack">
 			<input type="hidden" name="_csrf" value={csrfToken} />

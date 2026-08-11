@@ -3,10 +3,18 @@
 
 #include "config/server_config.h"
 
+#include <memory>
+
+namespace placedb::app {
+class RequestExecutor;
+}
+
 namespace placedb::http {
 
 /** Registers login CSRF, login, logout, and current-user endpoints. */
-void RegisterAuthRoutes(const config::ServerConfig& config);
+void RegisterAuthRoutes(
+    const config::ServerConfig& config,
+    std::shared_ptr<app::RequestExecutor> request_executor);
 
 }  // namespace placedb::http
 

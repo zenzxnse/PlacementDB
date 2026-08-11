@@ -1,11 +1,13 @@
 <script lang="ts">
 	import Comments from '$lib/components/Comments.svelte';
+	import Unavailable from '$lib/components/Unavailable.svelte';
 	import type { ActionData, PageData } from './$types';
 	import { formatDate, roundLabel, companyName, visibleOutcome, splitParagraphs } from '$lib/format';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	const experience = $derived(data.experience);
+	const retryCommentsHref = $derived(`/experiences/${data.experience.slug}#comments-heading`);
 </script>
 
 <svelte:head>
@@ -28,7 +30,7 @@
 		<dt>Role</dt>
 		<dd>{experience.role?.name ?? 'Not recorded'}</dd>
 		<dt>Year</dt>
-		<dd>{experience.source_year}</dd>
+		<dd>{experience.source_year ?? 'Not recorded'}</dd>
 		{#if visibleOutcome(experience)}
 			<dt>Outcome</dt>
 			<dd>{visibleOutcome(experience)}</dd>
@@ -80,11 +82,27 @@
 	</p>
 </article>
 
-<Comments
-	comments={data.comments.items}
-	nextCursor={data.comments.next_cursor}
-	me={data.me}
-	action="?/comment"
-	csrfToken={data.csrfToken}
-	error={form?.commentError}
-/>
+{#if data.commentsError}
+	<!--
+		Comments failed to load, but the experience body above still rendered.
+		Show an honest unavailable panel and offer to retry the same page;
+		retrying the comment cursor would loop if the cursor itself is stale.
+	-->
+	<section class="comments" aria-labelledby="comments-unavailable">
+		<h2 id="comments-unavailable">Comments</h2>
+		<Unavailable
+			failure={data.commentsError}
+			retryHref={retryCommentsHref}
+			escape={{ href: '/experiences', label: 'Back to experiences' }}
+		/>
+	</section>
+{:else}
+	<Comments
+		comments={data.comments.items}
+		nextCursor={data.comments.next_cursor}
+		me={data.me}
+		action="?/comment"
+		csrfToken={data.csrfToken}
+		error={form?.commentError}
+	/>
+{/if}

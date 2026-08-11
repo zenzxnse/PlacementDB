@@ -4,6 +4,7 @@ import {
 	fixtureQuestions
 } from './fixtures';
 import { ROUND_VALUES } from '$lib/types';
+import { difficultyLevel } from '$lib/format';
 import type {
 	Company,
 	NamedSlug,
@@ -37,8 +38,8 @@ function questionMatchesFilters(q: Question, f: QuestionFilters): boolean {
 		return false;
 	if (f.year.length > 0 && !f.year.some((y) => y === String(q.source_year))) return false;
 	if (f.difficulty.length > 0) {
-		const rounded = q.difficulty.mean === null ? null : Math.round(q.difficulty.mean);
-		if (rounded === null || !f.difficulty.some((d) => d === String(rounded))) return false;
+		const rounded = difficultyLevel(q.difficulty.mean);
+		if (!f.difficulty.some((d) => d === String(rounded))) return false;
 	}
 	return true;
 }
@@ -47,7 +48,9 @@ function experienceMatchesFilters(e: Experience, f: ExperienceFilters): boolean 
 	if (f.company.length > 0 && !f.company.some((c) => matchesCompany(c, e.company))) return false;
 	if (f.role.length > 0 && !f.role.some((r) => r === e.role?.slug)) return false;
 	if (f.year.length > 0 && !f.year.some((y) => y === String(e.source_year))) return false;
-	if (f.outcome.length > 0 && !f.outcome.some((o) => o === e.outcome)) return false;
+	/* A hidden outcome matches no outcome filter; the union has no field to read. */
+	const outcome = e.outcome_visible ? e.outcome : null;
+	if (f.outcome.length > 0 && !f.outcome.some((o) => o === outcome)) return false;
 	return true;
 }
 
@@ -232,7 +235,7 @@ export function getFilterOptions(): FilterOptions {
 		if (e.company) companies.set(e.company.slug, e.company);
 		if (e.role) roles.set(e.role.slug, e.role);
 		if (e.source_year !== null) years.add(e.source_year);
-		if (e.outcome) outcomes.add(e.outcome);
+		if (e.outcome_visible) outcomes.add(e.outcome);
 	}
 
 	return {

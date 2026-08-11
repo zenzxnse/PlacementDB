@@ -77,7 +77,7 @@ describe('session cookie forwarding', () => {
 
 		await apiCall(event as never, '/me');
 
-		const sent = String((calls[0].init.headers as Record<string, string>).cookie);
+		const sent = String((calls[0]!.init.headers as Record<string, string>).cookie);
 		expect(sent).toContain('__Host-placedb_session=sess-value');
 		expect(sent).toContain('__Host-placedb_login_csrf=csrf-value');
 		expect(sent).not.toContain('unrelated_analytics');
@@ -141,7 +141,7 @@ describe('origin on mutations', () => {
 
 		await apiCall(event as never, '/auth/logout', { method: 'POST' });
 
-		expect((calls[0].init.headers as Record<string, string>).origin).toBe(
+		expect((calls[0]!.init.headers as Record<string, string>).origin).toBe(
 			'https://placedb.example'
 		);
 	});
@@ -152,7 +152,7 @@ describe('origin on mutations', () => {
 
 		await apiCall(event as never, '/questions');
 
-		expect((calls[0].init.headers as Record<string, string>).origin).toBeUndefined();
+		expect((calls[0]!.init.headers as Record<string, string>).origin).toBeUndefined();
 	});
 });
 

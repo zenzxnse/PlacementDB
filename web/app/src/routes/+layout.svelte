@@ -33,5 +33,12 @@
 			PlacementDB is a community question bank for SRM placements. Every submission is
 			reviewed by moderators before it appears.
 		</p>
+		<nav aria-label="Site information">
+			<ul class="footer-links">
+				<li><a href="/about">About</a></li>
+				<li><a href="/about/help">Help</a></li>
+				<li><a href="/about/moderation">How moderation works</a></li>
+			</ul>
+		</nav>
 	</div>
 </footer>

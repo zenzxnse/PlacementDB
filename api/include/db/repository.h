@@ -8,6 +8,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace placedb::db {
@@ -49,6 +50,17 @@ class QuestionRepository {
         const drogon::orm::DbClientPtr& trans,
         std::int64_t question_id,
         std::int64_t actor_id) const;
+
+    Result<QuestionRecord> FindOwnedEditable(const drogon::orm::DbClientPtr& trans,
+        const std::string& public_id, std::int64_t author_id) const;
+    Result<QuestionRecord> ReplaceDraft(const drogon::orm::DbClientPtr& trans,
+        std::int64_t id, const std::string& expected_updated_at,
+        std::optional<std::int64_t> company_id, const std::string& title,
+        const std::string& prompt, std::optional<std::string> answer_guidance,
+        std::optional<std::int64_t> job_role_id, std::optional<std::string> round,
+        std::optional<std::int16_t> source_year) const;
+    Result<void> ReplaceTopics(const drogon::orm::DbClientPtr& trans,
+        std::int64_t question_id, const std::vector<std::int64_t>& topic_ids) const;
 
     Result<void> Moderate(
         const drogon::orm::DbClientPtr& trans,
@@ -98,6 +110,18 @@ class ExperienceRepository {
         std::int64_t experience_id,
         std::int64_t actor_id) const;
 
+    Result<ExperienceRecord> FindOwnedEditable(const drogon::orm::DbClientPtr& trans,
+        const std::string& public_id, std::int64_t author_id) const;
+    Result<ExperienceRecord> ReplaceDraft(const drogon::orm::DbClientPtr& trans,
+        std::int64_t id, const std::string& expected_updated_at,
+        std::optional<std::int64_t> company_id, const std::string& title,
+        const std::string& narrative, std::optional<std::int64_t> job_role_id,
+        std::optional<std::int16_t> source_year, std::optional<std::string> outcome,
+        bool outcome_visible, bool anonymous) const;
+    Result<void> ReplaceRounds(const drogon::orm::DbClientPtr& trans,
+        std::int64_t experience_id,
+        const std::vector<std::pair<std::string, std::optional<std::string>>>& rounds) const;
+
     Result<void> Moderate(
         const drogon::orm::DbClientPtr& trans,
         std::int64_t experience_id,
@@ -116,6 +140,13 @@ class UserRepository {
     explicit UserRepository(const std::shared_ptr<drogon::orm::DbClient>& client);
     Result<UserRecord> FindById(std::int64_t id) const;
     Result<UserRecord> FindLoginCandidate(const std::string& username) const;
+
+    Result<UserRecord> Create(
+        const drogon::orm::DbClientPtr& transaction,
+        const std::string& username,
+        const std::string& email,
+        const std::string& display_name,
+        const std::string& password_hash) const;
 
     /**
      * Resolves a system account by username, and only a system account.

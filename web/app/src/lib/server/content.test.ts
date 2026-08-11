@@ -127,16 +127,24 @@ describe('accepted rendering rules', () => {
 		 * "Unknown" or "Hidden", tells a reader something about the placement
 		 * the author chose to withhold.
 		 */
-		expect(visibleOutcome({ outcome_visible: false, outcome: 'offered' })).toBeNull();
 		expect(visibleOutcome({ outcome_visible: false })).toBeNull();
+		/*
+		 * The old form of this test also passed `{ outcome_visible: false,
+		 * outcome: 'offered' }`, which the union now makes a compile error: the
+		 * hidden branch has no `outcome` to read. The runtime half of that
+		 * guarantee moved to the parser test, which proves an `outcome`
+		 * arriving from a misbehaving backend alongside visibility false is
+		 * dropped rather than rendered.
+		 */
 	});
 
 	it('shows a visible outcome', () => {
 		expect(visibleOutcome({ outcome_visible: true, outcome: 'offered' })).toBe('Offered');
 	});
 
-	it('distinguishes a visible but unrecorded outcome from a hidden one', () => {
-		expect(visibleOutcome({ outcome_visible: true, outcome: null })).toBe('Not recorded');
+	it('labels an explicitly unknown outcome, which is a real choice', () => {
+		/* Distinct from hidden: the author said so rather than withholding it. */
+		expect(visibleOutcome({ outcome_visible: true, outcome: 'unknown' })).toBe('Unknown');
 	});
 
 	it('labels all ten accepted rounds and tolerates null', () => {

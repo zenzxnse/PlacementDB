@@ -104,15 +104,8 @@ domain::QuestionSummary RowToSummary(const Row& row) {
         summary.topics_ = ParseTopics(row["topics"].template as<std::string>());
     }
 
-    /**
-     * mean is null when no eligible vote exists. The contract requires null
-     * rather than zero, because a mean of zero votes is not a difficulty of
-     * zero, and the client renders "not rated yet" from exactly this.
-     */
-    if (!row["difficulty_mean"].isNull()) {
-        summary.difficulty_.mean_ =
-            row["difficulty_mean"].template as<double>();
-    }
+    summary.difficulty_.mean_ =
+        row["difficulty_mean"].template as<double>();
     summary.difficulty_.vote_count_ =
         row["difficulty_votes"].template as<std::int32_t>();
 
@@ -135,7 +128,7 @@ constexpr const char* kSummaryColumns =
     "q.round, q.source_year, "
     "to_char(q.published_at AT TIME ZONE 'UTC', "
     "'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS published_at, "
-    "d.mean AS difficulty_mean, "
+    "COALESCE(d.mean, 3.0)::float8 AS difficulty_mean, "
     "COALESCE(d.votes, 0)::int AS difficulty_votes, "
     "t.packed AS topics, "
     "count(*) OVER()::bigint AS total_count ";
@@ -152,9 +145,9 @@ constexpr const char* kSummaryJoins =
     "LEFT JOIN companies c ON c.id = q.company_id "
     "LEFT JOIN job_roles jr ON jr.id = q.job_role_id "
     "LEFT JOIN LATERAL ("
-    "  SELECT avg(v.value)::float8 AS mean, count(*)::int AS votes "
-    "  FROM difficulty_votes v "
-    "  WHERE v.question_id = q.id AND v.cleared_at IS NULL"
+    "  SELECT ((9.0 + s.weighted_sum) / (3.0 + s.weight_sum))::float8 AS mean, "
+    "         s.vote_count::int AS votes "
+    "  FROM question_difficulty_scores s WHERE s.question_id = q.id"
     ") d ON true "
     "LEFT JOIN LATERAL ("
     "  SELECT string_agg(tp.slug || E'\\x1F' || tp.name, E'\\x1E') AS packed "

@@ -8,6 +8,8 @@
 
 namespace placedb::http {
 
+void SubmissionContractCases();
+
 void TestErrorWireContract() {
     assert(std::string(WireCode(ApiErrorCode::kValidationFailed)) ==
           "VALIDATION_FAILED");
@@ -40,11 +42,17 @@ void TestSessionExpiryAndTouchPolicy();
 void TestAddressTruncationRejectsMalformedInput();
 }
 
+namespace placedb::db {
+void LookupCountsArePublishedOnlyAndSchemaAware();
+}
+
 int main() {
+    placedb::db::LookupCountsArePublishedOnlyAndSchemaAware();
     placedb::auth::TestSecureSessionCookieContract();
     placedb::auth::TestSystemAndSuspendedAccountsCannotAuthenticate();
     placedb::auth::TestSessionExpiryAndTouchPolicy();
     placedb::auth::TestAddressTruncationRejectsMalformedInput();
     placedb::http::TestErrorWireContract();
     placedb::http::TestValidatorCollectsSafeFieldErrors();
+    placedb::http::SubmissionContractCases();
 }

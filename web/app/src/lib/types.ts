@@ -62,9 +62,23 @@ export type Company = NamedSlug;
 export type Topic = NamedSlug;
 export type JobRole = NamedSlug;
 
+export interface LookupCount extends NamedSlug {
+	question_count: number;
+	experience_count: number;
+}
+
+export interface LookupCountPage {
+	items: LookupCount[];
+}
+
 export interface Difficulty {
-	/** Null when vote_count is 0. Null is not a difficulty of zero. */
-	mean: number | null;
+	/*
+	 * Never null. Zero votes yields 3.0 (the prior), per the 2026-08-11
+	 * weighted-scoring decision. vote_count is the honest disclosure that
+	 * tells the reader whether the mean reflects community placement or the
+	 * default.
+	 */
+	mean: number;
 	vote_count: number;
 }
 
@@ -95,29 +109,34 @@ export interface ExperienceRound {
 	notes: string | null;
 }
 
-export interface ExperienceSummary {
+/**
+ * Outcome visibility, encoded so the wrong shape cannot compile.
+ *
+ * When visibility is false the API omits `outcome` entirely rather than
+ * sending null, and this union makes that structural: there is no `outcome`
+ * property to read on the hidden branch, so a template cannot accidentally
+ * render one. The old shape was `outcome_visible: boolean` plus
+ * `outcome?: Outcome | null`, which could not tell a hidden outcome from an
+ * unknown one, and a hidden outcome rendered as "Unknown". That discloses
+ * something the author chose to withhold, and it matters most for imported
+ * records where the student never consented here at all.
+ */
+export type OutcomeVisibility =
+	| { outcome_visible: true; outcome: Outcome }
+	| { outcome_visible: false };
+
+export type ExperienceSummary = {
 	public_id: string;
 	slug: string;
 	title: string;
 	company: Company | null;
 	role: JobRole | null;
 	source_year: number | null;
-	/**
-	 * When false the API omits `outcome` entirely rather than sending null.
-	 *
-	 * The old shape had only `outcome: Outcome | null`, which could not tell a
-	 * hidden outcome from an unknown one, so a hidden outcome rendered as
-	 * "Unknown". That discloses something about the placement the author chose
-	 * to withhold, and it matters most for imported records where the student
-	 * never consented here at all.
-	 */
-	outcome_visible: boolean;
-	outcome?: Outcome | null;
 	author: Author | null;
 	published_at: string;
-}
+} & OutcomeVisibility;
 
-export interface Experience extends ExperienceSummary {
+export type Experience = ExperienceSummary & {
 	/**
 	 * One plain-text string, not a pre-split array. Paragraph splitting is
 	 * presentation and happens at render time, so the author's exact text
@@ -125,7 +144,7 @@ export interface Experience extends ExperienceSummary {
 	 */
 	narrative: string;
 	rounds: ExperienceRound[];
-}
+};
 
 export interface QuestionFilters {
 	company: string[];
@@ -238,6 +257,23 @@ export interface CommentPage {
 	/** Opaque cursor. Comments use cursor pagination, never offsets. */
 	next_cursor: string | null;
 }
+
+/**
+ * Response to PUT /questions/{public_id}/difficulty.
+ *
+ * `my_vote` appears only here. No read route exposes the caller's own vote, so
+ * a freshly loaded page cannot pre-select the radio the user last chose; it
+ * only knows after a vote in the same session. That is a backend gap, recorded
+ * rather than papered over with a guess.
+ */
+export interface DifficultyVoteResult {
+	difficulty: Difficulty;
+	my_vote: number;
+}
+
+/** The accepted 1-5 scale. Shared by the vote control and its validation. */
+export const DIFFICULTY_MIN = 1;
+export const DIFFICULTY_MAX = 5;
 
 export const COMMENT_MIN_LENGTH = 1;
 export const COMMENT_MAX_LENGTH = 4000;

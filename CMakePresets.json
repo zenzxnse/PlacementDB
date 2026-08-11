@@ -64,6 +64,15 @@
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "PLACEDB_ENABLE_UBSAN": "ON"
       }
+    },
+    {
+      "name": "linux-tsan",
+      "inherits": "linux-base",
+      "displayName": "Linux ThreadSanitizer",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "PLACEDB_ENABLE_TSAN": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -71,7 +80,8 @@
     { "name": "linux-release", "configurePreset": "linux-release", "jobs": 1 },
     { "name": "linux-strict", "configurePreset": "linux-strict", "jobs": 1 },
     { "name": "linux-asan", "configurePreset": "linux-asan", "jobs": 1 },
-    { "name": "linux-ubsan", "configurePreset": "linux-ubsan", "jobs": 1 }
+    { "name": "linux-ubsan", "configurePreset": "linux-ubsan", "jobs": 1 },
+    { "name": "linux-tsan", "configurePreset": "linux-tsan", "jobs": 1 }
   ],
   "testPresets": [
     {
@@ -88,6 +98,7 @@
     { "name": "linux-release", "inherits": "linux-test-base", "configurePreset": "linux-release" },
     { "name": "linux-strict", "inherits": "linux-test-base", "configurePreset": "linux-strict" },
     { "name": "linux-asan", "inherits": "linux-test-base", "configurePreset": "linux-asan" },
-    { "name": "linux-ubsan", "inherits": "linux-test-base", "configurePreset": "linux-ubsan" }
+    { "name": "linux-ubsan", "inherits": "linux-test-base", "configurePreset": "linux-ubsan" },
+    { "name": "linux-tsan", "inherits": "linux-test-base", "configurePreset": "linux-tsan" }
   ]
 }

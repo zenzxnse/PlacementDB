@@ -1,23 +1,31 @@
-/*
- * Database repository contract tests.
- * Placeholder: requires Drogon integration to compile.
- * These tests verify repository behavior against a real PostgreSQL 17
- * database with the migration schema applied.
- */
+#include "db/repository.h"
 
-/* #include <gtest/gtest.h> */
-/* #include "db/repository.h" */
+#include <cassert>
+#include <type_traits>
 
-/*
- * Test: question create returns draft state.
- * Test: submit_for_review transitions draft to pending_review.
- * Test: moderate approves pending_review to published with outbox row.
- * Test: moderate rejects with expected_state conflict detection.
- * Test: difficulty vote upsert maintains one active vote per user.
- * Test: difficulty vote clear sets cleared_at.
- * Test: report create enforces one open report per reporter and target.
- * Test: session create and find round-trip.
- * Test: session delete_expired removes only expired rows.
- * Test: list_published returns bounded results with per_page cap.
- * Test: find_by_public_id returns kNotFound for missing records.
- */
+namespace {
+
+void RepositoryInterfacesRemainConstructible() {
+    using Client = const std::shared_ptr<drogon::orm::DbClient>&;
+    static_assert(
+        std::is_constructible_v<placedb::db::UserRepository, Client>);
+    static_assert(
+        std::is_constructible_v<placedb::db::QuestionRepository, Client>);
+    static_assert(
+        std::is_constructible_v<placedb::db::ExperienceRepository, Client>);
+    static_assert(std::is_constructible_v<
+                  placedb::db::DifficultyVoteRepository, Client>);
+    static_assert(std::is_constructible_v<
+                  placedb::db::ContentReportRepository, Client>);
+    static_assert(
+        std::is_constructible_v<placedb::db::SessionRepository, Client>);
+
+    const auto result =
+        placedb::db::Result<int>::Err(placedb::db::DbError::kUnavailable);
+    assert(result.IsErr());
+    assert(result.error() == placedb::db::DbError::kUnavailable);
+}
+
+}  // namespace
+
+int main() { RepositoryInterfacesRemainConstructible(); }

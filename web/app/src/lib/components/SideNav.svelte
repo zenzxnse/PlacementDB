@@ -22,29 +22,29 @@
 		{ href: '/', label: 'Home', icon: 'home' },
 		{ href: '/questions', label: 'Questions', icon: 'questions' },
 		{ href: '/experiences', label: 'Experiences', icon: 'experiences' },
-		{ href: '/topics', label: 'Topics', icon: 'tag' },
+		{ href: '/topics', label: 'Topics', icon: 'topics' },
 		{ href: '/companies', label: 'Companies', icon: 'companies' }
 	];
 
-	const personal = $derived<Item[]>(
-		me
-			? [
-					{ href: '/submit/question', label: 'Submit', icon: 'submit' },
-					{ href: '/account/saved', label: 'Saved', icon: 'saved' },
-					{ href: '/account/activity', label: 'Your activity', icon: 'activity' }
-				]
-			: []
+	/**
+	 * The personal group is now a real capability gate: /submit exists, so
+	 * `can_submit` decides whether the entry is rendered at all. Authorization
+	 * still lives in the API; hiding the link is only about not offering a
+	 * control that would be refused.
+	 *
+	 * The moderation group stays empty because none of its routes exist yet,
+	 * and a nav entry to a 404 is worse than no entry. It is deliberately NOT
+	 * written as `me?.can_moderate ? [] : []`: a ternary with an empty array on
+	 * both sides reads as gating while gating nothing, which is exactly how the
+	 * earlier render tests passed no matter what the booleans said.
+	 */
+	const personal: Item[] = $derived(
+		me?.can_submit ? [{ href: '/submit', label: 'Submit', icon: 'submit' }] : []
 	);
-
-	const moderation = $derived<Item[]>(
-		me?.can_moderate
-			? [
-					{ href: '/moderation/queue', label: 'Review queue', icon: 'moderation' },
-					{ href: '/moderation/reports', label: 'Reports', icon: 'reports' },
-					{ href: '/moderation/audit', label: 'Audit log', icon: 'audit' }
-				]
-			: []
-	);
+	const moderation: Item[] = $derived(me?.can_moderate ? [
+		{ href: '/moderation/queue', label: 'Review queue', icon: 'moderation' },
+		{ href: '/moderation/audit', label: 'Audit log', icon: 'activity' }
+	] : []);
 
 	function isCurrent(href: string): boolean {
 		if (href === '/') return pathname === '/';
@@ -86,9 +86,6 @@
 					<a href={item.href} aria-current={isCurrent(item.href) ? 'page' : undefined}>
 						<Icon name={item.icon} />
 						<span>{item.label}</span>
-						{#if item.href === '/moderation/queue' && me && me.unread_moderation_count > 0}
-							<span class="badge-count">{me.unread_moderation_count}</span>
-						{/if}
 					</a>
 				</li>
 			{/each}

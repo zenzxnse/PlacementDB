@@ -108,7 +108,7 @@
 						{hit.kind === 'question' ? 'Question' : 'Experience'} &middot;
 						{companyName(hit.company)} &middot; {hit.source_year ?? 'Year not recorded'}
 						{#if hit.difficulty}
-							&middot; Difficulty {difficultySummary(hit.difficulty)}
+							&middot; {difficultySummary(hit.difficulty)}
 						{/if}
 					</p>
 					<p>{hit.snippet}</p>

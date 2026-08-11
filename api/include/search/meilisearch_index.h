@@ -7,8 +7,10 @@
 #include <trantor/net/EventLoop.h>
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <thread>
+#include <vector>
 
 namespace placedb::search {
 
@@ -27,6 +29,17 @@ struct MeilisearchSettings {
     /** Restricted to the Meilisearch index uid alphabet. */
     std::string index_uid_;
     double timeout_seconds_{10.0};
+};
+
+struct SearchCandidate {
+    std::string target_type_;
+    std::string public_id_;
+    std::string snippet_;
+};
+
+struct SearchQueryResult {
+    std::vector<SearchCandidate> hits_;
+    std::int64_t estimated_total_{};
 };
 
 /**
@@ -56,6 +69,14 @@ class MeilisearchIndex : public SearchIndex {
 
     bool Upsert(const SearchDocument& document) override;
     bool Remove(const std::string& target_type, std::int64_t target_id) override;
+
+    /** Bounded public discovery query. Null means unavailable/malformed. */
+    std::optional<SearchQueryResult> Query(const std::string& query,
+                                           std::size_t offset,
+                                           std::size_t limit) const;
+
+    static std::optional<SearchQueryResult> ParseQueryResponse(
+        const std::string& body, std::size_t maximum_hits);
 
     /** Composite document key: the target type plus its internal id. */
     static std::string DocumentId(const std::string& target_type,

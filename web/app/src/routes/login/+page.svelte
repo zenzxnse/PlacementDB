@@ -107,6 +107,6 @@
 </form>
 
 <p class="meta">
-	Registration, password reset, and account recovery are deferred until email delivery has an
-	owner. Accounts are provisioned for the prototype.
+	No account yet? <a href="/register">Create one</a>. Password reset and account recovery are
+	still deferred until email delivery has an owner, so choose a password you can remember.
 </p>

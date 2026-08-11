@@ -20,7 +20,13 @@
 	<div class="panel-head">Avatar</div>
 	<div class="panel-body">
 		{#if avatarMessage}
+			<!--
+				Error summary: an explicit heading inside makes the region
+				navigable as the next heading after the page H1, matching the
+				login pattern. role="alert" announces the contents once.
+			-->
 			<div class="error-summary" role="alert" tabindex="-1" id="avatar-error">
+				<h2>Avatar could not be updated</h2>
 				<p>{avatarMessage}</p>
 				{#if form?.requestId}
 					<p class="meta">Reference: <code>{form.requestId}</code></p>

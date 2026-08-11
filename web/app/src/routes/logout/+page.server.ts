@@ -1,6 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import type { Actions } from './$types';
 import { apiCall } from '$lib/server/api';
+import { parseCsrf } from '$lib/wire';
 
 /**
  * Logout.
@@ -15,7 +16,7 @@ import { apiCall } from '$lib/server/api';
 export const actions: Actions = {
 	default: async (event) => {
 		try {
-			const issued = await apiCall<{ csrf_token: string }>(event, '/auth/csrf');
+			const issued = await apiCall(event, '/auth/csrf', { parse: parseCsrf });
 			await apiCall(event, '/auth/logout', {
 				method: 'POST',
 				headers: { 'x-csrf-token': issued.csrf_token },

@@ -1,6 +1,8 @@
 #ifndef PLACEDB_HTTP_QUESTION_ROUTES_H
 #define PLACEDB_HTTP_QUESTION_ROUTES_H
 
+#include "config/server_config.h"
+
 /**
  * Public question endpoints from the accepted JSON contract.
  *
@@ -14,9 +16,17 @@
  * are the read model's job, so a handler cannot forget a predicate.
  */
 
+#include <memory>
+
+namespace placedb::app {
+class RequestExecutor;
+}
+
 namespace placedb::http {
 
-void RegisterQuestionRoutes();
+void RegisterQuestionRoutes(
+    const config::ServerConfig& config,
+    const std::shared_ptr<app::RequestExecutor>& request_executor);
 
 /** Call after a question publication, hide, edit, vote, or topic change. */
 void InvalidateQuestionResponseCache();

@@ -5,6 +5,7 @@
 #include <cctype>
 #include <cmath>
 #include <stdexcept>
+#include <limits>
 #include <utility>
 
 namespace placedb::search {
@@ -128,6 +129,74 @@ bool MeilisearchIndex::Remove(const std::string& target_type,
     request->setPath("/indexes/" + settings_.index_uid_ + "/documents/"
                      + DocumentId(target_type, target_id));
     return Send(std::move(request));
+}
+
+std::optional<SearchQueryResult> MeilisearchIndex::Query(
+    const std::string& query, const std::size_t offset,
+    const std::size_t limit) const {
+    if (!http_ || query.empty() || query.size() > 200 || limit == 0 ||
+        limit > 20 || offset > 3980) return std::nullopt;
+    Json::Value payload;
+    payload["q"] = query;
+    payload["offset"] = static_cast<Json::UInt64>(offset);
+    payload["limit"] = static_cast<Json::UInt64>(limit);
+    payload["attributesToRetrieve"] = Json::arrayValue;
+    payload["attributesToRetrieve"].append("kind");
+    payload["attributesToRetrieve"].append("public_id");
+    payload["attributesToRetrieve"].append("body");
+    payload["attributesToCrop"] = Json::arrayValue;
+    payload["attributesToCrop"].append("body");
+    payload["cropLength"] = 240;
+    payload["highlightPreTag"] = "";
+    payload["highlightPostTag"] = "";
+    Json::StreamWriterBuilder writer;
+    writer["indentation"] = "";
+    auto request = drogon::HttpRequest::newHttpRequest();
+    request->setMethod(drogon::Post);
+    request->setPath("/indexes/" + settings_.index_uid_ + "/search");
+    request->setContentTypeCode(drogon::CT_APPLICATION_JSON);
+    request->setBody(Json::writeString(writer, payload));
+    if (!settings_.api_key_.empty())
+        request->addHeader("Authorization", "Bearer " + settings_.api_key_);
+    const auto [result, response] = http_->sendRequest(
+        request, settings_.timeout_seconds_);
+    if (result != drogon::ReqResult::Ok || !response ||
+        response->getStatusCode() != drogon::k200OK ||
+        response->body().size() > 256 * 1024) return std::nullopt;
+    return ParseQueryResponse(std::string(response->body()), limit);
+}
+
+std::optional<SearchQueryResult> MeilisearchIndex::ParseQueryResponse(
+    const std::string& body, const std::size_t maximum_hits) {
+    if (body.size() > 256 * 1024 || maximum_hits > 20) return std::nullopt;
+    Json::CharReaderBuilder builder;
+    Json::Value root;
+    std::string errors;
+    std::istringstream input(body);
+    if (!Json::parseFromStream(builder, input, &root, &errors) ||
+        !root.isObject() || !root["hits"].isArray() ||
+        !root["estimatedTotalHits"].isIntegral()) return std::nullopt;
+    const auto total = root["estimatedTotalHits"].asInt64();
+    if (total < 0 || root["hits"].size() > maximum_hits)
+        return std::nullopt;
+    SearchQueryResult output;
+    output.estimated_total_ = total;
+    for (const auto& hit : root["hits"]) {
+        if (!hit.isObject() || !hit["kind"].isString() ||
+            !hit["public_id"].isString()) return std::nullopt;
+        const std::string kind = hit["kind"].asString();
+        const std::string id = hit["public_id"].asString();
+        if ((kind != "question" && kind != "experience") || id.size() != 36)
+            return std::nullopt;
+        std::string snippet;
+        if (hit.isMember("_formatted") && hit["_formatted"].isObject() &&
+            hit["_formatted"]["body"].isString())
+            snippet = hit["_formatted"]["body"].asString();
+        else if (hit["body"].isString()) snippet = hit["body"].asString();
+        if (snippet.size() > 1024) return std::nullopt;
+        output.hits_.push_back({kind, id, std::move(snippet)});
+    }
+    return output;
 }
 
 bool MeilisearchIndex::Send(drogon::HttpRequestPtr request) const {

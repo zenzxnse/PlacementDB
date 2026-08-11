@@ -20,12 +20,20 @@ include(PlacementDBWarnings)
 option(PLACEDB_WARNINGS_AS_ERRORS "Treat project warnings as errors" OFF)
 option(PLACEDB_ENABLE_ASAN "Enable AddressSanitizer for project targets" OFF)
 option(PLACEDB_ENABLE_UBSAN "Enable UndefinedBehaviorSanitizer for project targets" OFF)
+option(PLACEDB_ENABLE_TSAN "Enable ThreadSanitizer for project targets" OFF)
 option(PLACEDB_BUILD_PRODUCTION_SERVER "Build the production Drogon API" ON)
 option(PLACEDB_BUILD_FIXTURE_SERVER "Build the database-free fixture server" OFF)
 option(PLACEDB_BUILD_ISOLATED_TESTS "Build isolated project test targets" ON)
 
-if(PLACEDB_ENABLE_ASAN AND PLACEDB_ENABLE_UBSAN)
-  message(FATAL_ERROR "ASan and UBSan must use separate presets")
+set(placedb_enabled_sanitizers 0)
+foreach(placedb_sanitizer_flag IN ITEMS
+    PLACEDB_ENABLE_ASAN PLACEDB_ENABLE_UBSAN PLACEDB_ENABLE_TSAN)
+  if(${placedb_sanitizer_flag})
+    math(EXPR placedb_enabled_sanitizers "${placedb_enabled_sanitizers} + 1")
+  endif()
+endforeach()
+if(placedb_enabled_sanitizers GREATER 1)
+  message(FATAL_ERROR "Sanitizers are mutually exclusive; use separate presets")
 endif()
 
 add_library(placedb_project_options INTERFACE)
@@ -74,6 +82,8 @@ if(PLACEDB_BUILD_PRODUCTION_SERVER)
   add_executable(
     placedb_server
     api/src/main.cc
+    api/src/app/runtime.cc
+    api/src/app/request_executor.cc
     api/src/auth/authorization.cc
     api/src/auth/csrf.cc
     api/src/auth/ip_address.cc
@@ -84,6 +94,7 @@ if(PLACEDB_BUILD_PRODUCTION_SERVER)
     api/src/config/server_config.cc
     api/src/db/import.cc
     api/src/db/experience_read_model.cc
+    api/src/db/content_lookup.cc
     api/src/db/outbox.cc
     api/src/db/question_read_model.cc
     api/src/db/repository.cc
@@ -92,12 +103,17 @@ if(PLACEDB_BUILD_PRODUCTION_SERVER)
     api/src/http/api_error.cc
     api/src/http/auth_routes.cc
     api/src/http/content_routes.cc
+    api/src/http/current_user.cc
     api/src/http/question_routes.cc
     api/src/http/public_response_cache.cc
     api/src/http/request_context.cc
     api/src/http/request_policy.cc
     api/src/http/social_routes.cc
+    api/src/http/moderation_routes.cc
+    api/src/http/submission_contract.cc
+    api/src/http/submission_routes.cc
     api/src/ranking/ranking.cc
+    api/src/ranking/difficulty_score.cc
     api/src/search/search_worker.cc
     api/src/search/meilisearch_index.cc
     api/src/storage/avatar_store.cc
@@ -137,136 +153,152 @@ if(PLACEDB_BUILD_FIXTURE_SERVER)
 endif()
 
 if(BUILD_TESTING AND PLACEDB_BUILD_ISOLATED_TESTS)
-  add_executable(
-    placedb_ranking_tests
-    api/src/ranking/ranking.cc
-    tests/ranking/ranking_test.cc
-  )
-  target_include_directories(
-    placedb_ranking_tests
-    PRIVATE
-      "${CMAKE_CURRENT_SOURCE_DIR}/api/include"
-  )
-  target_link_libraries(
-    placedb_ranking_tests
-    PRIVATE
-      Drogon::Drogon
-      PlacementDB::ProjectOptions
-  )
-  add_test(NAME placedb_ranking_tests COMMAND placedb_ranking_tests)
+  # Declares one isolated contract test binary. Every target automatically
+  # receives the project options, the api/include path, CTest registration,
+  # and -UNDEBUG. Sanitizer presets use an optimized configuration that
+  # defines NDEBUG, and these binaries intentionally check with assert(), so
+  # their assertions must stay active in every build configuration. Using
+  # this helper is what keeps that guarantee; do not add a test target with
+  # a bare add_executable.
+  function(placedb_add_test target_name)
+    cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "SOURCES;LINK")
+    if(NOT arg_SOURCES)
+      message(FATAL_ERROR "placedb_add_test(${target_name}) needs SOURCES")
+    endif()
+    add_executable("${target_name}" ${arg_SOURCES})
+    target_include_directories(
+      "${target_name}"
+      PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/api/include"
+    )
+    target_link_libraries(
+      "${target_name}"
+      PRIVATE
+        ${arg_LINK}
+        PlacementDB::ProjectOptions
+    )
+    target_compile_options("${target_name}" PRIVATE -UNDEBUG)
+    add_test(NAME "${target_name}" COMMAND "${target_name}")
+  endfunction()
 
-  add_executable(
-    placedb_api_contract_tests
-    api/src/auth/ip_address.cc
-    api/src/auth/session.cc
-    api/src/http/api_error.cc
-    api/src/validation/validator.cc
+  placedb_add_test(placedb_ranking_tests
+    SOURCES
+      api/src/ranking/difficulty_score.cc
+      api/src/ranking/ranking.cc
+      tests/ranking/ranking_test.cc
+    LINK Drogon::Drogon
+  )
+
+  placedb_add_test(placedb_api_contract_tests
+    SOURCES
+      api/src/auth/ip_address.cc
+      api/src/auth/session.cc
+      api/src/db/content_lookup.cc
+      api/src/http/api_error.cc
+      api/src/http/submission_contract.cc
+      api/src/validation/validator.cc
+      tests/auth/session_test.cc
+      tests/http/api_contract_test.cc
+      tests/http/content_lookup_test.cc
+      tests/http/submission_contract_test.cc
+    LINK Drogon::Drogon
+  )
+
+  placedb_add_test(placedb_security_tests
+    SOURCES
+      api/src/auth/authorization.cc
+      api/src/auth/csrf.cc
+      api/src/auth/rate_limiter.cc
+      api/src/auth/secret.cc
+      api/src/dto/serialization.cc
+      api/src/http/request_policy.cc
+      tests/security/security_contract_test.cc
+    LINK Drogon::Drogon "${PLACEDB_SODIUM_LIBRARY}"
+  )
+
+  placedb_add_test(placedb_search_tests
+    SOURCES
+      api/src/db/outbox.cc
+      api/src/search/meilisearch_index.cc
+      api/src/search/search_worker.cc
+      tests/search/search_worker_test.cc
+    LINK Drogon::Drogon
+  )
+
+  placedb_add_test(placedb_cache_tests
+    SOURCES
+      api/src/http/public_response_cache.cc
+      tests/http/public_response_cache_test.cc
+  )
+
+  placedb_add_test(placedb_avatar_store_tests
+    SOURCES
+      api/src/auth/secret.cc
+      api/src/storage/avatar_store.cc
+      tests/storage/avatar_store_test.cc
+    LINK Drogon::Drogon "${PLACEDB_SODIUM_LIBRARY}"
+  )
+
+  placedb_add_test(placedb_server_config_tests
+    SOURCES
+      api/src/config/server_config.cc
+      tests/app/server_config_test.cc
+  )
+
+  placedb_add_test(placedb_request_executor_tests
+    SOURCES
+      api/src/app/request_executor.cc
+      tests/app/request_executor_test.cc
+  )
+
+  placedb_add_test(placedb_ip_address_tests
+    SOURCES
+      api/src/auth/ip_address.cc
+      tests/auth/ip_address_test.cc
+  )
+
+  placedb_add_test(placedb_repository_contract_tests
+    SOURCES
+      tests/db/repository_test.cc
+    LINK Drogon::Drogon
+  )
+
+  placedb_add_test(placedb_moderation_contract_tests
+    SOURCES
+      tests/http/moderation_contract_test.cc
+  )
+  target_compile_definitions(placedb_moderation_contract_tests
+    PRIVATE PLACEDB_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+
+  set(
+    PLACEDB_WIRED_CPP_TEST_SOURCES
+    tests/app/server_config_test.cc
+    tests/app/request_executor_test.cc
+    tests/auth/ip_address_test.cc
     tests/auth/session_test.cc
+    tests/db/repository_test.cc
     tests/http/api_contract_test.cc
-  )
-  target_include_directories(
-    placedb_api_contract_tests
-    PRIVATE
-      "${CMAKE_CURRENT_SOURCE_DIR}/api/include"
-  )
-  target_link_libraries(
-    placedb_api_contract_tests
-    PRIVATE
-      Drogon::Drogon
-      PlacementDB::ProjectOptions
-  )
-  add_test(NAME placedb_api_contract_tests COMMAND placedb_api_contract_tests)
-
-  add_executable(
-    placedb_security_tests
-    api/src/auth/authorization.cc
-    api/src/auth/csrf.cc
-    api/src/auth/rate_limiter.cc
-    api/src/auth/secret.cc
-    api/src/dto/serialization.cc
-    api/src/http/request_policy.cc
-    tests/security/security_contract_test.cc
-  )
-  target_include_directories(
-    placedb_security_tests
-    PRIVATE
-      "${CMAKE_CURRENT_SOURCE_DIR}/api/include"
-  )
-  target_link_libraries(
-    placedb_security_tests
-    PRIVATE
-      Drogon::Drogon
-      "${PLACEDB_SODIUM_LIBRARY}"
-      PlacementDB::ProjectOptions
-  )
-  add_test(NAME placedb_security_tests COMMAND placedb_security_tests)
-
-  add_executable(
-    placedb_search_tests
-    api/src/db/outbox.cc
-    api/src/search/search_worker.cc
-    tests/search/search_worker_test.cc
-  )
-  target_include_directories(
-    placedb_search_tests
-    PRIVATE
-      "${CMAKE_CURRENT_SOURCE_DIR}/api/include"
-  )
-  target_link_libraries(
-    placedb_search_tests
-    PRIVATE
-      Drogon::Drogon
-      PlacementDB::ProjectOptions
-  )
-  add_test(NAME placedb_search_tests COMMAND placedb_search_tests)
-
-  add_executable(
-    placedb_cache_tests
-    api/src/http/public_response_cache.cc
+    tests/http/content_lookup_test.cc
+    tests/http/submission_contract_test.cc
+    tests/http/moderation_contract_test.cc
     tests/http/public_response_cache_test.cc
-  )
-  target_include_directories(
-    placedb_cache_tests
-    PRIVATE
-      "${CMAKE_CURRENT_SOURCE_DIR}/api/include"
-  )
-  target_link_libraries(
-    placedb_cache_tests
-    PRIVATE
-      PlacementDB::ProjectOptions
-  )
-  add_test(NAME placedb_cache_tests COMMAND placedb_cache_tests)
-
-  add_executable(
-    placedb_avatar_store_tests
-    api/src/auth/secret.cc
-    api/src/storage/avatar_store.cc
+    tests/ranking/ranking_test.cc
+    tests/search/search_worker_test.cc
+    tests/security/security_contract_test.cc
     tests/storage/avatar_store_test.cc
   )
-  target_include_directories(
-    placedb_avatar_store_tests
-    PRIVATE
-      "${CMAKE_CURRENT_SOURCE_DIR}/api/include"
+  file(
+    GLOB_RECURSE PLACEDB_ALL_CPP_TEST_SOURCES
+    CONFIGURE_DEPENDS
+    RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
+    "tests/*.cc"
   )
-  target_link_libraries(
-    placedb_avatar_store_tests
-    PRIVATE
-      Drogon::Drogon
-      "${PLACEDB_SODIUM_LIBRARY}"
-      PlacementDB::ProjectOptions
-  )
-  add_test(NAME placedb_avatar_store_tests COMMAND placedb_avatar_store_tests)
-
-  # Sanitizer presets use an optimized configuration that defines NDEBUG.
-  # These small contract binaries intentionally use assert(), so keep their
-  # checks active in every build configuration.
-  foreach(placedb_test_target IN ITEMS
-      placedb_ranking_tests
-      placedb_api_contract_tests
-      placedb_security_tests
-      placedb_search_tests
-      placedb_cache_tests
-      placedb_avatar_store_tests)
-    target_compile_options(${placedb_test_target} PRIVATE -UNDEBUG)
+  foreach(placedb_test_source IN LISTS PLACEDB_ALL_CPP_TEST_SOURCES)
+    if(NOT placedb_test_source IN_LIST PLACEDB_WIRED_CPP_TEST_SOURCES)
+      message(
+        FATAL_ERROR
+        "C++ test source is not assigned to a target: ${placedb_test_source}"
+      )
+    endif()
   endforeach()
 endif()

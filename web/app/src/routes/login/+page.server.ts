@@ -1,6 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { apiCall, apiLoginCall, ApiError, ApiUnavailable } from '$lib/server/api';
+import { parseCsrf } from '$lib/wire';
 
 /**
  * Login through the accepted contract.
@@ -18,7 +19,7 @@ interface CsrfResponse {
 
 export const load: PageServerLoad = async (event) => {
 	try {
-		const issued = await apiCall<CsrfResponse>(event, '/auth/csrf');
+		const issued = await apiCall(event, '/auth/csrf', { parse: parseCsrf });
 		return { csrfToken: issued.csrf_token, apiReachable: true };
 	} catch {
 		/**

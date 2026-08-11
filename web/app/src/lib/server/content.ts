@@ -1,6 +1,18 @@
 import type { RequestEvent } from '@sveltejs/kit';
 import { apiCall, ApiError, ApiUnavailable } from './api';
 import { USE_FIXTURES } from './config';
+import {
+	parseCommentPage,
+	parseExperience,
+	parseExperiencePage,
+	parseFilterOptions,
+	parseMe,
+	parseLookupCountPage,
+	parseProfile,
+	parseQuestion,
+	parseQuestionPage,
+	parseSearchPage
+} from '$lib/wire';
 import * as fixtures from './data';
 import type {
 	Experience,
@@ -16,6 +28,7 @@ import type {
 	Sort,
 	PublicProfile,
 	CommentPage
+	, LookupCountPage
 } from '$lib/types';
 import { DEFAULT_AVATAR_URL } from '$lib/types';
 
@@ -32,6 +45,14 @@ import { DEFAULT_AVATAR_URL } from '$lib/types';
  */
 
 type Event = Pick<RequestEvent, 'cookies' | 'fetch' | 'request'>;
+
+export async function listLookupCounts(
+	event: Event,
+	target: 'topics' | 'companies'
+): Promise<LookupCountPage> {
+	if (USE_FIXTURES) return { items: [] };
+	return apiCall(event, `/${target}`, { parse: parseLookupCountPage });
+}
 
 function queryString(params: Record<string, string | number | undefined>, repeated: Record<string, string[]> = {}): string {
 	const search = new URLSearchParams();
@@ -52,8 +73,8 @@ export async function listQuestions(
 	event: Event,
 	params: { sort: Sort; page: number; filters: QuestionFilters }
 ): Promise<Page<QuestionSummary>> {
-	if (USE_FIXTURES) return fixtures.listQuestions(params) as unknown as Page<QuestionSummary>;
-	return apiCall<Page<QuestionSummary>>(
+	if (USE_FIXTURES) return fixtures.listQuestions(params);
+	return apiCall(
 		event,
 		`/questions${queryString(
 			{ sort: params.sort, page: params.page },
@@ -64,14 +85,17 @@ export async function listQuestions(
 				year: params.filters.year,
 				difficulty: params.filters.difficulty
 			}
-		)}`
+		)}`,
+		{ parse: parseQuestionPage }
 	);
 }
 
 export async function getQuestion(event: Event, slug: string): Promise<Question | null> {
-	if (USE_FIXTURES) return fixtures.getQuestionBySlug(slug) as unknown as Question | null;
+	if (USE_FIXTURES) return fixtures.getQuestionBySlug(slug);
 	try {
-		return await apiCall<Question>(event, `/questions/by-slug/${encodeURIComponent(slug)}`);
+		return await apiCall(event, `/questions/by-slug/${encodeURIComponent(slug)}`, {
+			parse: parseQuestion
+		});
 	} catch (error) {
 		/* NOT_FOUND covers absent and invisible alike, by contract. */
 		if (error instanceof ApiError && error.status === 404) return null;
@@ -83,8 +107,8 @@ export async function listExperiences(
 	event: Event,
 	params: { page: number; filters: ExperienceFilters }
 ): Promise<Page<ExperienceSummary>> {
-	if (USE_FIXTURES) return fixtures.listExperiences(params) as unknown as Page<ExperienceSummary>;
-	return apiCall<Page<ExperienceSummary>>(
+	if (USE_FIXTURES) return fixtures.listExperiences(params);
+	return apiCall(
 		event,
 		`/experiences${queryString(
 			{ page: params.page },
@@ -94,14 +118,17 @@ export async function listExperiences(
 				year: params.filters.year,
 				outcome: params.filters.outcome
 			}
-		)}`
+		)}`,
+		{ parse: parseExperiencePage }
 	);
 }
 
 export async function getExperience(event: Event, slug: string): Promise<Experience | null> {
-	if (USE_FIXTURES) return fixtures.getExperienceBySlug(slug) as unknown as Experience | null;
+	if (USE_FIXTURES) return fixtures.getExperienceBySlug(slug);
 	try {
-		return await apiCall<Experience>(event, `/experiences/by-slug/${encodeURIComponent(slug)}`);
+		return await apiCall(event, `/experiences/by-slug/${encodeURIComponent(slug)}`, {
+			parse: parseExperience
+		});
 	} catch (error) {
 		if (error instanceof ApiError && error.status === 404) return null;
 		throw error;
@@ -114,7 +141,7 @@ export async function search(
 ): Promise<SearchOutcome> {
 	if (USE_FIXTURES) return fixtures.search(params);
 	try {
-		const results = await apiCall<Page<import('$lib/types').SearchHit>>(
+		const results = await apiCall(
 			event,
 			`/search${queryString(
 				{ q: params.q, page: params.page },
@@ -125,7 +152,8 @@ export async function search(
 					year: params.filters.year,
 					difficulty: params.filters.difficulty
 				}
-			)}`
+			)}`,
+			{ parse: parseSearchPage }
 		);
 		return { status: 'ok', results };
 	} catch (error) {
@@ -145,7 +173,7 @@ export async function search(
 
 export async function getFilterOptions(event: Event): Promise<FilterOptions> {
 	if (USE_FIXTURES) return fixtures.getFilterOptions();
-	return apiCall<FilterOptions>(event, '/meta/filter-options');
+	return apiCall(event, '/meta/filter-options', { parse: parseFilterOptions });
 }
 
 /**
@@ -174,7 +202,7 @@ export function loginWithReturn(pathAndQuery: string): string {
 export async function getMe(event: Event): Promise<Me | null> {
 	if (USE_FIXTURES) return null;
 	try {
-		return await apiCall<Me | null>(event, '/me');
+		return await apiCall(event, '/me', { parse: parseMe });
 	} catch (error) {
 		if (error instanceof ApiError && (error.status === 401 || error.status === 404)) {
 			return null;
@@ -194,7 +222,9 @@ export async function getMe(event: Event): Promise<Me | null> {
 export async function getProfile(event: Event, username: string): Promise<PublicProfile | null> {
 	if (USE_FIXTURES) return mockProfile(username);
 	try {
-		return await apiCall<PublicProfile>(event, `/users/${encodeURIComponent(username)}`);
+		return await apiCall(event, `/users/${encodeURIComponent(username)}`, {
+			parse: parseProfile
+		});
 	} catch (error) {
 		if (error instanceof ApiError && error.status === 404) return null;
 		throw error;
@@ -209,10 +239,9 @@ export async function listComments(
 ): Promise<CommentPage> {
 	if (USE_FIXTURES) return { items: [], next_cursor: null };
 	const query = cursor ? `?after=${encodeURIComponent(cursor)}` : '';
-	return apiCall<CommentPage>(
-		event,
-		`/${target}/by-slug/${encodeURIComponent(slug)}/comments${query}`
-	);
+	return apiCall(event, `/${target}/by-slug/${encodeURIComponent(slug)}/comments${query}`, {
+		parse: parseCommentPage
+	});
 }
 
 function mockProfile(username: string): PublicProfile {

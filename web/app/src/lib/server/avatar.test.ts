@@ -71,7 +71,7 @@ describe('apiUpload multipart contract', () => {
 
 		await apiUpload(event as never, '/me/avatar', form);
 
-		const headers = calls[0].init.headers as Record<string, string>;
+		const headers = calls[0]!.init.headers as Record<string, string>;
 		const keys = Object.keys(headers).map((k) => k.toLowerCase());
 		expect(keys).not.toContain('content-type');
 	});
@@ -84,8 +84,8 @@ describe('apiUpload multipart contract', () => {
 
 		await apiUpload(event as never, '/me/avatar', form);
 
-		expect(calls[0].init.body).toBeInstanceOf(FormData);
-		expect(calls[0].init.method).toBe('POST');
+		expect(calls[0]!.init.body).toBeInstanceOf(FormData);
+		expect(calls[0]!.init.method).toBe('POST');
 	});
 
 	it('sends CSRF token, exact origin, and the forwarded session', async () => {
@@ -96,7 +96,7 @@ describe('apiUpload multipart contract', () => {
 
 		await apiUpload(event as never, '/me/avatar', form, { csrfToken: 'tok-123' });
 
-		const headers = calls[0].init.headers as Record<string, string>;
+		const headers = calls[0]!.init.headers as Record<string, string>;
 		expect(headers['x-csrf-token']).toBe('tok-123');
 		expect(headers.origin).toBe('https://placedb.example');
 		expect(headers.cookie).toContain('__Host-placedb_session=sess');
@@ -143,13 +143,15 @@ describe('avatar removal', () => {
 		const { apiCall } = await import('./api');
 		const { event, calls } = makeEvent(async () => json({ avatar_url: DEFAULT_AVATAR_URL }));
 
-		const result = await apiCall<{ avatar_url: string }>(event as never, '/me/avatar', {
+		const { parseAvatar } = await import('$lib/wire');
+		const result = await apiCall(event as never, '/me/avatar', {
 			method: 'DELETE',
-			headers: { 'x-csrf-token': 'tok' }
+			headers: { 'x-csrf-token': 'tok' },
+			parse: parseAvatar
 		});
 
-		expect(calls[0].init.method).toBe('DELETE');
-		expect((calls[0].init.headers as Record<string, string>)['x-csrf-token']).toBe('tok');
+		expect(calls[0]!.init.method).toBe('DELETE');
+		expect((calls[0]!.init.headers as Record<string, string>)['x-csrf-token']).toBe('tok');
 		expect(result.avatar_url).toBe(DEFAULT_AVATAR_URL);
 	});
 

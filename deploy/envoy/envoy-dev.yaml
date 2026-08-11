@@ -57,6 +57,18 @@ static_resources:
                             value: "noindex, nofollow"
                           append_action: OVERWRITE_IF_EXISTS_OR_ADD
                       routes:
+                        # Drogon owns operational health. Keep these exact
+                        # routes ahead of the SvelteKit catch-all.
+                        - match:
+                            path: /healthz
+                          route:
+                            cluster: placedb_api
+                            timeout: 2s
+                        - match:
+                            path: /readyz
+                          route:
+                            cluster: placedb_api
+                            timeout: 2s
                         - match:
                             path: /api
                           route:

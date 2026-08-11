@@ -1,6 +1,7 @@
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { apiCall, apiUpload, toFailure } from '$lib/server/api';
+import { parseAvatar, parseCsrf } from '$lib/wire';
 import { getMe, getProfile } from '$lib/server/content';
 import { DEFAULT_AVATAR_URL, type AvatarResponse, type Me } from '$lib/types';
 import { redirect } from '@sveltejs/kit';
@@ -47,7 +48,7 @@ interface CsrfResponse {
 type ApiEvent = Parameters<typeof apiCall>[0];
 
 async function csrfToken(event: ApiEvent): Promise<string> {
-	const issued = await apiCall<CsrfResponse>(event, '/auth/csrf');
+	const issued = await apiCall(event, '/auth/csrf', { parse: parseCsrf });
 	return issued.csrf_token;
 }
 
@@ -111,7 +112,8 @@ export const actions: Actions = {
 		upstream.append('avatar', file, 'avatar');
 
 		try {
-			const result = await apiUpload<AvatarResponse>(event, '/me/avatar', upstream, {
+			const result = await apiUpload(event, '/me/avatar', upstream, {
+				parse: parseAvatar,
 				csrfToken: token
 			});
 			return avatarResult(result.avatar_url, 'saved');
@@ -139,7 +141,8 @@ export const actions: Actions = {
 			return fail(403, avatarFailure('This form expired. Reload the page and try again.'));
 		}
 		try {
-			const result = await apiCall<AvatarResponse>(event, '/me/avatar', {
+			const result = await apiCall(event, '/me/avatar', {
+				parse: parseAvatar,
 				method: 'DELETE',
 				headers: { 'x-csrf-token': token }
 			});
