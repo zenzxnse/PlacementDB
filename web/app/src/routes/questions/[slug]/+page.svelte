@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Comments from '$lib/components/Comments.svelte';
 	import DifficultyVote from '$lib/components/DifficultyVote.svelte';
+	import ContentReport from '$lib/components/ContentReport.svelte';
 	import Unavailable from '$lib/components/Unavailable.svelte';
 	import type { ActionData, PageData } from './$types';
 	import { formatDate, roundLabel, companyName } from '$lib/format';
@@ -109,6 +110,8 @@
 	</p>
 </article>
 
+{#if data.me}<ContentReport csrfToken={data.csrfToken} outcome={form?.contentReport} />{/if}
+
 {#if data.commentsError}
 	<!--
 		Comments failed to load, but the question body above still rendered.
@@ -131,5 +134,7 @@
 		action="?/comment"
 		csrfToken={data.csrfToken}
 		error={form?.commentError}
+		reportResult={form?.reportResult}
+		hideResult={form?.hideResult}
 	/>
 {/if}

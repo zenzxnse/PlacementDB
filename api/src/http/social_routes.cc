@@ -11,6 +11,7 @@
 #include "http/request_context.h"
 #include "http/request_policy.h"
 #include "storage/avatar_store.h"
+#include "validation/unicode_text.h"
 
 #include <drogon/MultiPart.h>
 #include <drogon/drogon.h>
@@ -29,6 +30,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace placedb::http {
 namespace {
@@ -346,12 +348,294 @@ void CreateComment(const drogon::HttpRequestPtr& request,
     }
 }
 
+std::optional<std::int32_t> PageLimit(const drogon::HttpRequestPtr& request) {
+    const auto raw = request->getParameter("limit");
+    if (raw.empty()) return 20;
+    try {
+        std::size_t consumed = 0;
+        const int value = std::stoi(raw, &consumed);
+        if (consumed != raw.size() || value < 1 || value > 50) return std::nullopt;
+        return value;
+    } catch (...) {
+        return std::nullopt;
+    }
+}
+
+void CreateReport(const drogon::HttpRequestPtr& request,
+                  const std::shared_ptr<SocialState>& state,
+                  Callback&& callback) {
+    const std::string request_id = SelectRequestId(
+        request->getHeader("x-request-id"), true);
+    const auto current = Authenticate(request, *state);
+    if (!current) {
+        callback(Error(ApiErrorCode::kAuthRequired, "Sign in is required.", request_id));
+        return;
+    }
+    if (!TrustedMutation(request, *state, *current)) {
+        callback(Error(ApiErrorCode::kCsrfFailed,
+                       "The CSRF token was not accepted.", request_id));
+        return;
+    }
+    const auto policy = CheckJsonMutation("POST", request->getHeader("content-type"),
+                                           request->body().size(), 4U * 1024U);
+    if (policy != RequestPolicyDecision::kAllow) {
+        callback(Error(policy == RequestPolicyDecision::kPayloadTooLarge
+                           ? ApiErrorCode::kPayloadTooLarge
+                           : ApiErrorCode::kUnsupportedMediaType,
+                       "The report request could not be accepted.", request_id));
+        return;
+    }
+    const auto json = request->getJsonObject();
+    static const std::set<std::string> types{
+        "question", "experience", "user", "comment"};
+    static const std::set<std::string> reasons{
+        "spam", "offensive", "duplicate", "incorrect", "personal_info", "other"};
+    const auto names = json ? json->getMemberNames() : std::vector<std::string>{};
+    if (!json || !(*json)["target_type"].isString() ||
+        !types.contains((*json)["target_type"].asString()) ||
+        !(*json)["public_id"].isString() ||
+        !IsUuid((*json)["public_id"].asString()) ||
+        !(*json)["reason"].isString() ||
+        !reasons.contains((*json)["reason"].asString()) ||
+        std::any_of(names.begin(), names.end(), [](const std::string& key) {
+            return key != "target_type" && key != "public_id" &&
+                   key != "reason" && key != "details";
+        }) || (json->isMember("details") && !(*json)["details"].isString())) {
+        callback(Error(ApiErrorCode::kValidationFailed,
+                       "The report was not valid.", request_id));
+        return;
+    }
+    std::optional<std::string> details;
+    if (json->isMember("details")) {
+        const auto normalized = validation::NormalizeNfc((*json)["details"].asString());
+        if (!normalized || normalized->code_points > 1000) {
+            callback(Error(ApiErrorCode::kValidationFailed,
+                           "The report was not valid.", request_id));
+            return;
+        }
+        if (!normalized->value.empty()) details = normalized->value;
+    }
+    const auto rate = state->report_limiter.Consume(
+        std::to_string(current->user.id_), std::chrono::steady_clock::now());
+    if (!rate.allowed) {
+        callback(Error(ApiErrorCode::kRateLimited,
+                       "Too many reports. Please wait.", request_id));
+        return;
+    }
+    const std::string type = (*json)["target_type"].asString();
+    const std::string public_id = (*json)["public_id"].asString();
+    try {
+        auto transaction = drogon::app().getDbClient("default")->newTransaction();
+        const auto targets = [&] {
+        if (type == "question") {
+            return transaction->execSqlSync(
+                "SELECT id FROM questions WHERE public_id=$1::uuid "
+                "AND state='published' AND author_id<>$2 FOR SHARE",
+                public_id, current->user.id_);
+        } else if (type == "experience") {
+            return transaction->execSqlSync(
+                "SELECT id FROM experiences WHERE public_id=$1::uuid "
+                "AND state='published' AND author_id<>$2 FOR SHARE",
+                public_id, current->user.id_);
+        } else if (type == "comment") {
+            return transaction->execSqlSync(
+                "SELECT id FROM comments WHERE public_id=$1::uuid "
+                "AND state='visible' AND author_id<>$2 FOR SHARE",
+                public_id, current->user.id_);
+        } else {
+            return transaction->execSqlSync(
+                "SELECT id FROM users WHERE public_id=$1::uuid AND status='active' "
+                "AND NOT is_system AND id<>$2 FOR SHARE",
+                public_id, current->user.id_);
+        }}();
+        if (targets.empty()) {
+            transaction->rollback();
+            callback(Error(ApiErrorCode::kNotFound,
+                           "That report target does not exist.", request_id));
+            return;
+        }
+        const auto rows = transaction->execSqlSync(
+            "INSERT INTO content_reports(reporter_id,target_type,target_id,reason,details) "
+            "VALUES($1,$2,$3,$4,$5) RETURNING public_id::text,state,"
+            "to_char(created_at AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') created_at",
+            current->user.id_, type, targets[0]["id"].as<std::int64_t>(),
+            (*json)["reason"].asString(), details);
+        std::string body = "{\"public_id\":" +
+            dto::JsonString(rows[0]["public_id"].as<std::string>());
+        body += ",\"state\":\"open\",\"created_at\":" +
+            dto::JsonString(rows[0]["created_at"].as<std::string>()) + "}";
+        callback(Json(std::move(body), drogon::k201Created));
+    } catch (const drogon::orm::DrogonDbException& error) {
+        const std::string detail = error.base().what();
+        const bool duplicate = detail.find("content_reports_one_open_idx") !=
+                               std::string::npos;
+        callback(Error(duplicate ? ApiErrorCode::kConflict
+                                 : ApiErrorCode::kServiceUnavailable,
+                       duplicate ? "You already have an open report for that item."
+                                 : "The report could not be saved.", request_id));
+    }
+}
+
+void ListMySubmissions(const drogon::HttpRequestPtr& request,
+                       const SocialState& state, Callback&& callback) {
+    const auto current = Authenticate(request, state);
+    if (!current) {
+        callback(Error(ApiErrorCode::kAuthRequired, "Sign in is required.", ""));
+        return;
+    }
+    const auto limit = PageLimit(request);
+    const std::string cursor = request->getParameter("cursor");
+    if (!limit || (!cursor.empty() && !IsUuid(cursor))) {
+        callback(Error(ApiErrorCode::kValidationFailed,
+                       "The activity cursor or limit is invalid.", ""));
+        return;
+    }
+    try {
+        const auto rows = drogon::app().getDbClient("default")->execSqlSync(
+            "WITH items AS (SELECT 'question' kind,id,public_id,slug,title,state,updated_at "
+            "FROM questions WHERE author_id=$1 UNION ALL SELECT 'experience',id,public_id,"
+            "slug,title,state,updated_at FROM experiences WHERE author_id=$1), anchor AS "
+            "(SELECT updated_at,kind,id FROM items WHERE public_id=NULLIF($2,'')::uuid) "
+            "SELECT kind,public_id::text,slug,title,state,to_char(updated_at AT TIME ZONE 'UTC',"
+            "'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') updated_at FROM items WHERE $2='' OR "
+            "(updated_at,kind,id)<(SELECT updated_at,kind,id FROM anchor) ORDER BY "
+            "updated_at DESC,kind DESC,id DESC LIMIT $3",
+            current->user.id_, cursor, *limit + 1);
+        const auto count = std::min<std::size_t>(rows.size(), static_cast<std::size_t>(*limit));
+        std::string body = "{\"items\":[";
+        for (std::size_t i = 0; i < count; ++i) {
+            if (i) body.push_back(',');
+            body += "{\"kind\":" + dto::JsonString(rows[i]["kind"].as<std::string>());
+            for (const char* field : {"public_id", "slug", "title", "state", "updated_at"})
+                body += ",\"" + std::string(field) + "\":" +
+                    dto::JsonString(rows[i][field].as<std::string>());
+            body += "}";
+        }
+        body += "],\"next_cursor\":";
+        body += rows.size() > count
+            ? dto::JsonString(rows[count - 1]["public_id"].as<std::string>()) : "null";
+        callback(Json(body + "}"));
+    } catch (const drogon::orm::DrogonDbException&) {
+        callback(Error(ApiErrorCode::kServiceUnavailable,
+                       "Account activity is temporarily unavailable.", ""));
+    }
+}
+
+void ListMyVotes(const drogon::HttpRequestPtr& request,
+                 const SocialState& state, Callback&& callback) {
+    const auto current = Authenticate(request, state);
+    if (!current) { callback(Error(ApiErrorCode::kAuthRequired, "Sign in is required.", "")); return; }
+    const auto limit = PageLimit(request);
+    const std::string cursor = request->getParameter("cursor");
+    if (!limit || (!cursor.empty() && !IsUuid(cursor))) {
+        callback(Error(ApiErrorCode::kValidationFailed, "The activity cursor or limit is invalid.", "")); return;
+    }
+    try {
+        const auto rows = drogon::app().getDbClient("default")->execSqlSync(
+            "WITH anchor AS (SELECT dv.updated_at,dv.id FROM difficulty_votes dv JOIN questions q "
+            "ON q.id=dv.question_id WHERE dv.user_id=$1 AND dv.cleared_at IS NULL AND "
+            "q.public_id=NULLIF($2,'')::uuid) SELECT dv.value,q.public_id::text,q.slug,q.title,"
+            "q.state,to_char(dv.updated_at AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') "
+            "updated_at FROM difficulty_votes dv JOIN questions q ON q.id=dv.question_id "
+            "WHERE dv.user_id=$1 AND dv.cleared_at IS NULL AND ($2='' OR (dv.updated_at,dv.id)<"
+            "(SELECT updated_at,id FROM anchor)) ORDER BY dv.updated_at DESC,dv.id DESC LIMIT $3",
+            current->user.id_, cursor, *limit + 1);
+        const auto count = std::min<std::size_t>(rows.size(), static_cast<std::size_t>(*limit));
+        std::string body = "{\"items\":[";
+        for (std::size_t i = 0; i < count; ++i) {
+            if (i) body.push_back(',');
+            body += "{\"value\":" + std::to_string(rows[i]["value"].as<std::int16_t>());
+            body += ",\"updated_at\":" + dto::JsonString(rows[i]["updated_at"].as<std::string>());
+            body += ",\"target\":";
+            if (rows[i]["state"].as<std::string>() == "published") {
+                body += "{\"public_id\":" + dto::JsonString(rows[i]["public_id"].as<std::string>()) +
+                    ",\"slug\":" + dto::JsonString(rows[i]["slug"].as<std::string>()) +
+                    ",\"title\":" + dto::JsonString(rows[i]["title"].as<std::string>()) + "}";
+            } else body += "null";
+            body += "}";
+        }
+        body += "],\"next_cursor\":";
+        body += rows.size() > count ? dto::JsonString(rows[count - 1]["public_id"].as<std::string>()) : "null";
+        callback(Json(body + "}"));
+    } catch (const drogon::orm::DrogonDbException&) {
+        callback(Error(ApiErrorCode::kServiceUnavailable, "Account activity is temporarily unavailable.", ""));
+    }
+}
+
+void ListMyReports(const drogon::HttpRequestPtr& request,
+                   const SocialState& state, Callback&& callback) {
+    const auto current = Authenticate(request, state);
+    if (!current) { callback(Error(ApiErrorCode::kAuthRequired, "Sign in is required.", "")); return; }
+    const auto limit = PageLimit(request);
+    const std::string cursor = request->getParameter("cursor");
+    if (!limit || (!cursor.empty() && !IsUuid(cursor))) {
+        callback(Error(ApiErrorCode::kValidationFailed, "The activity cursor or limit is invalid.", "")); return;
+    }
+    try {
+        const auto rows = drogon::app().getDbClient("default")->execSqlSync(
+            "WITH anchor AS (SELECT created_at,id FROM content_reports WHERE reporter_id=$1 "
+            "AND public_id=NULLIF($2,'')::uuid) SELECT public_id::text,target_type,reason,details,"
+            "state,to_char(created_at AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') created_at "
+            "FROM content_reports WHERE reporter_id=$1 AND ($2='' OR (created_at,id)<"
+            "(SELECT created_at,id FROM anchor)) ORDER BY created_at DESC,id DESC LIMIT $3",
+            current->user.id_, cursor, *limit + 1);
+        const auto count = std::min<std::size_t>(rows.size(), static_cast<std::size_t>(*limit));
+        std::string body = "{\"items\":[";
+        for (std::size_t i = 0; i < count; ++i) {
+            if (i) body.push_back(',');
+            body += "{\"public_id\":" + dto::JsonString(rows[i]["public_id"].as<std::string>());
+            for (const char* field : {"target_type", "reason", "state", "created_at"})
+                body += ",\"" + std::string(field) + "\":" + dto::JsonString(rows[i][field].as<std::string>());
+            body += ",\"details\":" + (rows[i]["details"].isNull() ? std::string("null")
+                : dto::JsonString(rows[i]["details"].as<std::string>())) + "}";
+        }
+        body += "],\"next_cursor\":";
+        body += rows.size() > count ? dto::JsonString(rows[count - 1]["public_id"].as<std::string>()) : "null";
+        callback(Json(body + "}"));
+    } catch (const drogon::orm::DrogonDbException&) {
+        callback(Error(ApiErrorCode::kServiceUnavailable, "Account activity is temporarily unavailable.", ""));
+    }
+}
+
 }  // namespace
 
 void RegisterSocialRoutes(
     const config::ServerConfig& config,
     const std::shared_ptr<app::RequestExecutor>& request_db) {
     auto state = std::make_shared<SocialState>(config);
+    drogon::app().registerHandler(
+        "/api/v1/reports",
+        [state, request_db](const drogon::HttpRequestPtr& request,
+                            Callback&& response_callback) {
+            Dispatch(request_db, std::move(response_callback),
+                     [request, state](Callback callback) {
+                CreateReport(request, state, std::move(callback));
+            });
+        }, {drogon::Post});
+    drogon::app().registerHandler(
+        "/api/v1/me/submissions",
+        [state, request_db](const drogon::HttpRequestPtr& request,
+                            Callback&& response_callback) {
+            Dispatch(request_db, std::move(response_callback), [request, state](Callback callback) {
+                ListMySubmissions(request, *state, std::move(callback));
+            });
+        }, {drogon::Get});
+    drogon::app().registerHandler(
+        "/api/v1/me/votes",
+        [state, request_db](const drogon::HttpRequestPtr& request,
+                            Callback&& response_callback) {
+            Dispatch(request_db, std::move(response_callback), [request, state](Callback callback) {
+                ListMyVotes(request, *state, std::move(callback));
+            });
+        }, {drogon::Get});
+    drogon::app().registerHandler(
+        "/api/v1/me/reports",
+        [state, request_db](const drogon::HttpRequestPtr& request,
+                            Callback&& response_callback) {
+            Dispatch(request_db, std::move(response_callback), [request, state](Callback callback) {
+                ListMyReports(request, *state, std::move(callback));
+            });
+        }, {drogon::Get});
     drogon::app().registerHandler(
         "/api/v1/users/{1}",
         [request_db](const drogon::HttpRequestPtr&, Callback&& response_callback,

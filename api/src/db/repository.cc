@@ -510,23 +510,13 @@ Result<void> DifficultyVoteRepository::Upsert(
     std::int64_t user_id,
     std::int16_t value) const {
     try {
-        auto transaction = client_->newTransaction();
-        auto existing = transaction->execSqlSync(
-            "SELECT id, cleared_at FROM difficulty_votes "
-            "WHERE question_id = $1 AND user_id = $2 AND cleared_at IS NULL",
-            question_id, user_id);
-        if (!existing.empty()) {
-            transaction->execSqlSync(
-                "UPDATE difficulty_votes SET value = $1, updated_at = now() "
-                "WHERE id = $2",
-                value, existing[0]["id"].as<std::int64_t>());
-        } else {
-            transaction->execSqlSync(
-                "INSERT INTO difficulty_votes (question_id, user_id, value) "
-                "VALUES ($1, $2, $3)",
-                question_id, user_id, value);
-        }
-        transaction->execSqlSync(
+        client_->execSqlSync(
+            "INSERT INTO difficulty_votes (question_id, user_id, value) "
+            "VALUES ($1, $2, $3) ON CONFLICT (question_id, user_id) "
+            "WHERE cleared_at IS NULL DO UPDATE SET value=excluded.value, "
+            "updated_at=now()",
+            question_id, user_id, value);
+        client_->execSqlSync(
             "SELECT placedb_refresh_question_difficulty($1)", question_id);
         return Result<void>::Ok();
     } catch (const drogon::orm::DrogonDbException& e) {
@@ -538,10 +528,13 @@ Result<void> DifficultyVoteRepository::Clear(
     std::int64_t question_id,
     std::int64_t user_id) const {
     try {
-        client_->execSqlSync(
+        auto transaction = client_->newTransaction();
+        transaction->execSqlSync(
             "UPDATE difficulty_votes SET cleared_at = now(), updated_at = now() "
             "WHERE question_id = $1 AND user_id = $2 AND cleared_at IS NULL",
             question_id, user_id);
+        transaction->execSqlSync(
+            "SELECT placedb_refresh_question_difficulty($1)", question_id);
         return Result<void>::Ok();
     } catch (const drogon::orm::DrogonDbException& e) {
         return Result<void>::Err(MapException(e));

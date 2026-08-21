@@ -2,6 +2,7 @@ import { error, fail } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { getQuestion, getMe, listComments, loginWithReturn } from '$lib/server/content';
 import { apiCall, ApiError, toFailure } from '$lib/server/api';
+import { hideComment, reportComment, reportContent } from '$lib/server/comment-actions';
 import { parseCsrf, parseDifficultyVote } from '$lib/wire';
 import {
 	COMMENT_MAX_LENGTH,
@@ -145,5 +146,41 @@ export const actions: Actions = {
 			/* Everything else keeps only the safe classified message. */
 			return fail(502, { voteError: toFailure(error_).message });
 		}
+	},
+
+	/**
+	 * Report a comment, per the accepted comments/moderation contract.
+	 * Shared logic lives in comment-actions; this only unwraps the form.
+	 */
+	report: async (event) => {
+		const form = await event.request.formData();
+		const result = await reportComment(event, {
+			csrf: String(form.get('_csrf') ?? ''),
+			commentId: String(form.get('comment_id') ?? ''),
+			reason: String(form.get('reason') ?? ''),
+			details: String(form.get('details') ?? '').trim()
+		});
+		return result.kind === 'error' ? fail(400, { reportResult: result }) : { reportResult: result };
+	},
+
+	/** Moderator hide, with the required reason. */
+	hide: async (event) => {
+		const form = await event.request.formData();
+		const result = await hideComment(event, {
+			csrf: String(form.get('_csrf') ?? ''),
+			commentId: String(form.get('comment_id') ?? ''),
+			reason: String(form.get('reason') ?? '')
+		});
+		return result.kind === 'error' ? fail(400, { hideResult: result }) : { hideResult: result };
+	},
+	reportContent: async (event) => {
+		const form = await event.request.formData();
+		const question = await getQuestion(event, event.params.slug);
+		if (!question) error(404, 'That question does not exist.');
+		const result = await reportContent(event, {
+			csrf: String(form.get('_csrf') ?? ''), targetType: 'question', publicId: question.public_id,
+			reason: String(form.get('reason') ?? ''), details: String(form.get('details') ?? '').trim()
+		});
+		return result.kind === 'error' ? fail(400, { contentReport: result }) : { contentReport: result };
 	}
 };

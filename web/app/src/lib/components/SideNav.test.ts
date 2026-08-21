@@ -65,9 +65,6 @@ describe('SideNav route exposure', () => {
 	/* Every route the side panel must not link to until it is built. */
 	const unbuilt = [
 		'/account/saved',
-		'/account/activity',
-		'/account/inbox',
-		'/moderation/reports',
 		'/account/inbox'
 	];
 
@@ -82,12 +79,16 @@ describe('SideNav route exposure', () => {
 		for (const href of unbuilt) {
 			expect(html).not.toContain(`href="${href}"`);
 		}
+		if (me) expect(html).toContain('href="/account/activity"');
+		else expect(html).not.toContain('href="/account/activity"');
 		if (me?.can_moderate) {
 			expect(html).toContain('href="/moderation/queue"');
+			expect(html).toContain('href="/moderation/reports"');
 			expect(html).toContain('href="/moderation/audit"');
 			expect(html).toContain('id="sidenav-moderation"');
 		} else {
 			expect(html).not.toContain('href="/moderation/queue"');
+			expect(html).not.toContain('href="/moderation/reports"');
 			expect(html).not.toContain('id="sidenav-moderation"');
 		}
 	});
@@ -99,7 +100,7 @@ describe('SideNav route exposure', () => {
 
 		const refused = renderNav(makeMe({ can_submit: false }));
 		expect(refused).not.toContain('href="/submit"');
-		expect(refused).not.toContain('id="sidenav-you"');
+		expect(refused).toContain('id="sidenav-you"');
 	});
 
 	it('hides the submit entry from anonymous visitors', () => {

@@ -27,22 +27,23 @@
 	];
 
 	/**
-	 * The personal group is now a real capability gate: /submit exists, so
-	 * `can_submit` decides whether the entry is rendered at all. Authorization
-	 * still lives in the API; hiding the link is only about not offering a
-	 * control that would be refused.
+	 * The personal group is a real capability gate: `can_submit` decides
+	 * whether the entry is rendered at all. Authorization still lives in the
+	 * API; hiding the link is only about not offering a control that would be
+	 * refused.
 	 *
-	 * The moderation group stays empty because none of its routes exist yet,
-	 * and a nav entry to a 404 is worse than no entry. It is deliberately NOT
+	 * The moderation group is gated on `can_moderate`. It is deliberately NOT
 	 * written as `me?.can_moderate ? [] : []`: a ternary with an empty array on
 	 * both sides reads as gating while gating nothing, which is exactly how the
 	 * earlier render tests passed no matter what the booleans said.
 	 */
-	const personal: Item[] = $derived(
-		me?.can_submit ? [{ href: '/submit', label: 'Submit', icon: 'submit' }] : []
-	);
+	const personal: Item[] = $derived(me ? [
+		{ href: '/account/activity', label: 'Your activity', icon: 'activity' },
+		...(me.can_submit ? [{ href: '/submit', label: 'Submit', icon: 'submit' } as Item] : [])
+	] : []);
 	const moderation: Item[] = $derived(me?.can_moderate ? [
 		{ href: '/moderation/queue', label: 'Review queue', icon: 'moderation' },
+		{ href: '/moderation/reports', label: 'Reports', icon: 'reports' },
 		{ href: '/moderation/audit', label: 'Audit log', icon: 'activity' }
 	] : []);
 

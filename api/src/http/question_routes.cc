@@ -348,10 +348,12 @@ void RegisterQuestionRoutes(
                             (*completion)(response);
                             return;
                         }
-                        auto client = drogon::app().getDbClient("default");
-                        const auto rows = client->execSqlSync(
+                        auto transaction = drogon::app().getDbClient("default")
+                                               ->newTransaction();
+                        const auto rows = transaction->execSqlSync(
                             "SELECT id, author_id FROM questions "
-                            "WHERE public_id::text=$1 AND state='published'",
+                            "WHERE public_id::text=$1 AND state='published' "
+                            "FOR UPDATE",
                             public_id);
                         if (rows.empty()) {
                             (*completion)(ErrorResponse(ApiError::Make(
@@ -367,7 +369,7 @@ void RegisterQuestionRoutes(
                                 "You cannot rate your own question.")));
                             return;
                         }
-                        db::DifficultyVoteRepository votes(client);
+                        db::DifficultyVoteRepository votes(transaction);
                         const auto saved = votes.Upsert(
                             question_id, current->user.id_, value);
                         if (saved.IsErr()) {

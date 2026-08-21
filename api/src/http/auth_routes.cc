@@ -439,7 +439,7 @@ void RegisterAuthRoutes(
                 {"display_name", "OUT_OF_RANGE", "Use between 1 and 80 characters."});
             if (password.size() < auth::kMinPasswordLength ||
                 password.size() > auth::kMaxPasswordLength) fields.push_back(
-                {"password", "OUT_OF_RANGE", "Use between 12 and 256 characters."});
+                {"password", "OUT_OF_RANGE", "Use between 12 and 256 bytes."});
             if (!fields.empty()) {
                 callback(ErrorResponse(ApiError::Validation(
                     "Some fields need fixing.", std::move(fields)), request_id));

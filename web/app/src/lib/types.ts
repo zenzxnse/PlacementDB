@@ -277,3 +277,113 @@ export const DIFFICULTY_MAX = 5;
 
 export const COMMENT_MIN_LENGTH = 1;
 export const COMMENT_MAX_LENGTH = 4000;
+
+/**
+ * Accepted reasons for POST /comments/{public_id}/reports, from the accepted
+ * comments/moderation contract. The moderation report read echoes the same
+ * vocabulary, so the labels serve both surfaces.
+ */
+export type ReportReason =
+	| 'spam'
+	| 'offensive'
+	| 'duplicate'
+	| 'incorrect'
+	| 'personal_info'
+	| 'other';
+
+export const REPORT_REASON_VALUES: readonly ReportReason[] = [
+	'spam',
+	'offensive',
+	'duplicate',
+	'incorrect',
+	'personal_info',
+	'other'
+] as const;
+
+export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
+	spam: 'Spam',
+	offensive: 'Offensive',
+	duplicate: 'Duplicate',
+	incorrect: 'Incorrect',
+	personal_info: 'Personal information',
+	other: 'Something else'
+};
+
+/** Report details and every moderation reason share this ceiling. */
+export const REPORT_REASON_MAX_LENGTH = 1000;
+
+/** States a content report moves through, per the accepted contract. */
+export type ReportState = 'open' | 'under_review' | 'resolved' | 'dismissed';
+
+export const REPORT_STATE_VALUES: readonly ReportState[] = [
+	'open',
+	'under_review',
+	'resolved',
+	'dismissed'
+] as const;
+
+/**
+ * Outcome of a comment report or moderator hide, carried from the form action
+ * back to the comment it names. Lives here rather than in server code because
+ * the Comments component renders it, and $lib/server must stay unreachable
+ * from components.
+ */
+export interface CommentActionOutcome {
+	/** Which comment the outcome belongs to, so the UI anchors it there. */
+	commentId: string;
+	kind: 'reported' | 'hidden' | 'error';
+	message: string;
+	/** Present only on the expired-session branch. */
+	loginHref?: string;
+}
+
+/** One row of GET /moderation/reports, per the accepted contract. */
+export interface ModerationReportItem {
+	public_id: string;
+	target_type: string;
+	reason: string;
+	details: string | null;
+	state: ReportState;
+	reporter_label: string;
+	created_at: string;
+}
+
+export interface ModerationReportPage {
+	items: ModerationReportItem[];
+	next_cursor: string | null;
+}
+
+export interface AccountSubmissionItem {
+	kind: 'question' | 'experience';
+	public_id: string;
+	slug: string;
+	title: string;
+	state: string;
+	updated_at: string;
+}
+
+export interface AccountVoteItem {
+	value: number;
+	updated_at: string;
+	target: { public_id: string; slug: string; title: string } | null;
+}
+
+export interface AccountReportItem {
+	public_id: string;
+	target_type: 'question' | 'experience' | 'user' | 'comment';
+	reason: string;
+	details: string | null;
+	state: ReportState;
+	created_at: string;
+}
+
+export interface CursorPage<T> {
+	items: T[];
+	next_cursor: string | null;
+}
+
+export interface ContentReportOutcome {
+	kind: 'reported' | 'error';
+	message: string;
+	loginHref?: string;
+}

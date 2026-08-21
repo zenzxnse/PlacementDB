@@ -73,6 +73,11 @@ if(PLACEDB_BUILD_PRODUCTION_SERVER OR PLACEDB_BUILD_FIXTURE_SERVER OR PLACEDB_BU
 
 endif()
 
+if(PLACEDB_BUILD_PRODUCTION_SERVER OR
+   (BUILD_TESTING AND PLACEDB_BUILD_ISOLATED_TESTS))
+  find_package(ICU 74 REQUIRED COMPONENTS uc)
+endif()
+
 if(PLACEDB_BUILD_PRODUCTION_SERVER)
   find_library(
     PLACEDB_SODIUM_LIBRARY
@@ -118,6 +123,7 @@ if(PLACEDB_BUILD_PRODUCTION_SERVER)
     api/src/search/meilisearch_index.cc
     api/src/storage/avatar_store.cc
     api/src/validation/validator.cc
+    api/src/validation/unicode_text.cc
   )
   target_include_directories(
     placedb_server
@@ -129,6 +135,7 @@ if(PLACEDB_BUILD_PRODUCTION_SERVER)
     PRIVATE
       Drogon::Drogon
       "${PLACEDB_SODIUM_LIBRARY}"
+      ICU::uc
       PlacementDB::ProjectOptions
   )
 endif()
@@ -197,11 +204,12 @@ if(BUILD_TESTING AND PLACEDB_BUILD_ISOLATED_TESTS)
       api/src/http/api_error.cc
       api/src/http/submission_contract.cc
       api/src/validation/validator.cc
+      api/src/validation/unicode_text.cc
       tests/auth/session_test.cc
       tests/http/api_contract_test.cc
       tests/http/content_lookup_test.cc
       tests/http/submission_contract_test.cc
-    LINK Drogon::Drogon
+    LINK Drogon::Drogon ICU::uc
   )
 
   placedb_add_test(placedb_security_tests
